@@ -1,0 +1,35 @@
+{
+  "firmware_sha256": "4c60798f9e4921e51b1562abb943b4cb6a199e352fadf8265429c1be10c17488",
+  "self_test_passed": 61,
+  "self_test_total": 61,
+  "configuration_unchanged": true,
+  "wifi_weather_energy_live": true,
+  "target": "XIAO ESP32-S3 Plus / UC8179 800x480",
+  "version": "0.3.1",
+  "recorded_at_utc": "2026-10-15T20:53:25.012061+00:00",
+  "python_tool_tests": {
+    "passed": 11,
+    "total": 11
+  },
+  "firmware_build_passed": true,
+  "studio_locked_restore_build_and_publish": "passed, no GUI process launched",
+  "binary_build_machine_paths_removed": true,
+  "public_source_and_release_secret_audit": "passed",
+  "original_0_3_1_firmware_source_unchanged": true,
+  "historical_baseline": "hardware-0.3.1.json",
+  "optical_acceptance": "Existing font/factory-refresh policy accepted previously. This release changes build paths, not rendering; new layout physical acceptance remains pending.",
+  "release_files": {
+    "InkOS-Firmware-0.3.1.zip": {
+      "bytes": 1012890,
+      "sha256": "bca6d6464e0ca8fb702b0591310ec5a87d6e11ab247e69e6d98994413df40915"
+    },
+    "InkOS-Studio-0.3.0-Windows-x64.zip": {
+      "bytes": 48817798,
+      "sha256": "f4ad3f388fea0f2f23b9067c97f0b71a082042ae5fcc2d0bbd4b41db36ce9637"
+    },
+    "SHA256SUMS": {
+      "bytes": 194,
+      "sha256": "ae83acd65a6eef0a3c6610290ffa398d4514d59fd8829bf232a0096c232bba7f"
+    }
+  }
+}

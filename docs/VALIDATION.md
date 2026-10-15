@@ -6,7 +6,7 @@
 
 [公开摘要](validation/hardware-0.3.1.json) 只保存版本、固件 SHA、按 LF 归一化的源码 SHA、测试范围和限制。原始日志、私有 URL、芯片 MAC、IP、邮箱、NVS 与电脑路径保留在本地，不随仓库发布。
 
-当前 Release 如使用该已部署二进制，应与摘要的 firmware_sha256 匹配。重新编译可能因时间／工具链／路径产生不同 SHA，不自动继承“已烧录并验证”的结论。构建记录与硬件记录是两种证据。
+公开发布时又进行了路径重映射构建、实机烧录和 61/61 自检，完整保留配置。当前 Release 的 SHA 与本次实际验证见 [publication-0.3.1.json](validation/publication-0.3.1.json)；原先的 hardware 摘要保留为历史基线。重新编译产生的新 SHA 不自动继承旧硬件测试结论。
 
 ## 已检查的行为
 
