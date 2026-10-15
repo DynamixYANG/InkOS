@@ -1,0 +1,6 @@
+# Keep Tesserae's NVS at 0x9000; factory app starts at 0x20000.
+# Name,Type,SubType,Offset,Size,Flags
+nvs,data,nvs,0x9000,0x6000,
+otadata,data,ota,0x10000,0x2000,
+factory,app,factory,0x20000,0xC00000,
+storage,data,spiffs,0xC20000,0x3E0000,

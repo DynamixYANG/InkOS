@@ -1,0 +1,26 @@
+name: Source checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tools-and-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r tools/requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - run: python tools/check_repo.py
+  studio:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore desktop/InkOS.Studio/InkOS.Studio.csproj --locked-mode
+      - run: dotnet build desktop/InkOS.Studio/InkOS.Studio.csproj -c Release --no-restore

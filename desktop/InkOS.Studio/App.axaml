@@ -1,0 +1,28 @@
+<Application xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:shad="clr-namespace:ShadUI;assembly=ShadUI" x:Class="InkOS.Studio.App" RequestedThemeVariant="Light">
+ <Application.Resources>
+  <FontFamily x:Key="StudioFont">avares://InkOS Studio/Assets#IBM Plex Mono</FontFamily>
+  <CornerRadius x:Key="SmCornerRadius">3</CornerRadius>
+  <CornerRadius x:Key="MdCornerRadius">4</CornerRadius>
+  <CornerRadius x:Key="LgCornerRadius">4</CornerRadius>
+ </Application.Resources>
+ <Application.Styles>
+  <shad:ShadTheme/>
+  <Style Selector="shad|Window"><Setter Property="FontFamily" Value="{StaticResource StudioFont}"/><Setter Property="FontSize" Value="13"/><Setter Property="Foreground" Value="#202020"/><Setter Property="Background" Value="#FFFFFF"/></Style>
+  <Style Selector="TextBlock"><Setter Property="FontFamily" Value="{StaticResource StudioFont}"/><Setter Property="FontWeight" Value="Normal"/></Style>
+  <Style Selector="TextBlock.title"><Setter Property="FontSize" Value="28"/><Setter Property="FontWeight" Value="Light"/></Style>
+  <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="#656565"/><Setter Property="FontSize" Value="12"/><Setter Property="TextWrapping" Value="Wrap"/><Setter Property="LineHeight" Value="20"/></Style>
+  <Style Selector="TextBlock.label"><Setter Property="FontSize" Value="11"/><Setter Property="Foreground" Value="#666666"/><Setter Property="Margin" Value="0,0,0,6"/></Style>
+  <Style Selector="TextBox"><Setter Property="FontFamily" Value="{StaticResource StudioFont}"/><Setter Property="FontSize" Value="13"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="MinHeight" Value="36"/><Setter Property="CornerRadius" Value="4"/></Style>
+  <Style Selector="ComboBox"><Setter Property="FontFamily" Value="{StaticResource StudioFont}"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="FontSize" Value="13"/><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="MinHeight" Value="36"/></Style>
+  <Style Selector="Button"><Setter Property="FontFamily" Value="{StaticResource StudioFont}"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="FontSize" Value="12"/><Setter Property="MinHeight" Value="36"/><Setter Property="Padding" Value="14,8"/><Setter Property="CornerRadius" Value="4"/></Style>
+  <Style Selector="CheckBox"><Setter Property="FontFamily" Value="{StaticResource StudioFont}"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="FontSize" Value="13"/></Style>
+  <Style Selector="Button /template/ ContentPresenter"><Setter Property="FontFamily" Value="{StaticResource StudioFont}"/><Setter Property="FontWeight" Value="Normal"/></Style>
+  <Style Selector="Button /template/ TextBlock"><Setter Property="FontFamily" Value="{StaticResource StudioFont}"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="FontSize" Value="12"/></Style>
+  <Style Selector="Button.nav"><Setter Property="Height" Value="44"/><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Padding" Value="14,12"/><Setter Property="Margin" Value="0,0,0,5"/></Style>
+  <Style Selector="Button.nav.active"><Setter Property="Background" Value="#202020"/><Setter Property="Foreground" Value="White"/></Style>
+  <Style Selector="Button.nav.active /template/ ContentPresenter"><Setter Property="Foreground" Value="White"/></Style>
+  <Style Selector="Button.nav.active /template/ TextBlock"><Setter Property="Foreground" Value="White"/></Style>
+  <Style Selector="Border.section"><Setter Property="BorderBrush" Value="#E2E2E2"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="0,18"/></Style>
+ </Application.Styles>
+</Application>

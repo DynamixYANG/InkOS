@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="InkOS.Studio.Views.PlaceView">
+ <StackPanel>
+  <TextBlock Text="PLACE &amp; TIME / 02" Classes="label"/><TextBlock Text="Here, and elsewhere." Classes="title" Margin="0,0,0,10"/>
+  <TextBlock Text="Set your location, two world clocks and the weather source." Classes="muted" Margin="0,0,0,20"/>
+  <TextBlock Text="START WITH A PLACE" Classes="label"/><ComboBox ItemsSource="{Binding Places}" PlaceholderText="Choose a preset, or enter coordinates below" SelectionChanged="PlaceChanged"/>
+  <Border Classes="section"><Grid ColumnDefinitions="*,24,*"><StackPanel Spacing="12">
+   <StackPanel><TextBlock Text="PLACE NAME" Classes="label"/><TextBox Text="{Binding Settings.location,Mode=TwoWay}"/></StackPanel>
+   <StackPanel><TextBlock Text="LATITUDE" Classes="label"/><TextBox Text="{Binding LatitudeText,Mode=TwoWay}"/></StackPanel>
+  </StackPanel><StackPanel Grid.Column="2" Spacing="12">
+   <StackPanel><TextBlock Text="LOCAL TIME ZONE" Classes="label"/><ComboBox ItemsSource="{Binding Zones}" SelectedItem="{Binding Settings.zone,Mode=TwoWay}"/></StackPanel>
+   <StackPanel><TextBlock Text="LONGITUDE" Classes="label"/><TextBox Text="{Binding LongitudeText,Mode=TwoWay}"/></StackPanel>
+  </StackPanel></Grid></Border>
+  <Border Classes="section"><Grid ColumnDefinitions="*,24,*"><StackPanel Spacing="10">
+   <TextBlock Text="WORLD CLOCK / 01" Classes="label"/><TextBox Text="{Binding Settings.worlds[0].label,Mode=TwoWay}"/><ComboBox ItemsSource="{Binding Zones}" SelectedItem="{Binding Settings.worlds[0].zone,Mode=TwoWay}"/>
+  </StackPanel><StackPanel Grid.Column="2" Spacing="10">
+   <TextBlock Text="WORLD CLOCK / 02" Classes="label"/><TextBox Text="{Binding Settings.worlds[1].label,Mode=TwoWay}"/><ComboBox ItemsSource="{Binding Zones}" SelectedItem="{Binding Settings.worlds[1].zone,Mode=TwoWay}"/>
+  </StackPanel></Grid></Border>
+  <Border Classes="section"><StackPanel Spacing="12">
+   <StackPanel><TextBlock Text="WEATHER SOURCE" Classes="label"/><ComboBox SelectedIndex="{Binding Settings.weather_source,Mode=TwoWay}"><ComboBoxItem Content="Open-Meteo"/><ComboBoxItem Content="MET Norway / yr.no data"/></ComboBox></StackPanel>
+   <StackPanel><TextBlock Text="MET NORWAY / CONTACT EMAIL OR PROJECT URL" Classes="label"/><TextBox Text="{Binding Settings.met_contact,Mode=TwoWay}" PlaceholderText="Used to identify API requests"/></StackPanel>
+   <TextBlock Text="Weather data: Open-Meteo or MET Norway (CC BY 4.0). Missing measurements appear as —." Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+  <CheckBox Content="Frequent Home updates / icons + blinking colon" IsChecked="{Binding Settings.animations,Mode=TwoWay}" Margin="0,20,0,8"/>
+  <TextBlock Text="Off by default to preserve contrast. Uses the factory waveform; updates wait for the panel, so 0.5 s is not guaranteed. The clock still updates each minute when off." Classes="muted" FontSize="11"/>
+ </StackPanel>
+</UserControl>

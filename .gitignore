@@ -1,0 +1,36 @@
+# Local build products and downloads
+.build/
+out/
+dist/
+build/
+**/bin/
+**/obj/
+__pycache__/
+*.py[cod]
+*.elf
+*.map
+*.bin
+*.pdb
+*.log
+*.zip
+.venv/
+venv/
+.vs/
+.idea/
+.DS_Store
+Thumbs.db
+# Device/user data must never be published
+.local/
+private/
+backups/
+*-backup*/
+*nvs*.json
+credentials*
+.env
+.env.*
+!.env.example
+settings.local.*
+studio-diagnostic.txt
+flash-manifest.json
+device-status.json
+captures/

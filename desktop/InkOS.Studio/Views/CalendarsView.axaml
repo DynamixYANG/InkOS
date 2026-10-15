@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="InkOS.Studio.Views.CalendarsView">
+ <StackPanel>
+  <TextBlock Text="CALENDARS / 01" Classes="label"/><TextBlock Text="Your week, together." Classes="title" Margin="0,0,0,10"/>
+  <TextBlock Text="Read-only subscriptions for the weekly agenda and your next event.&#10;The screen fetches enabled calendars directly over Wi-Fi." Classes="muted" Margin="0,0,0,15"/>
+  <Border Classes="section"><StackPanel Spacing="10">
+   <Grid ColumnDefinitions="*,Auto"><CheckBox Content="Apple / iCloud" IsChecked="{Binding Feeds[0].enabled,Mode=TwoWay}"/><Button Grid.Column="1" Classes="Ghost"  Command="{Binding OpenLinkCommand}" CommandParameter="https://support.apple.com/guide/icloud/share-a-calendar-mm6b1a9479/icloud"><TextBlock Text="Setup guide ↗" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button></Grid>
+   <Grid ColumnDefinitions="190,16,*"><StackPanel><TextBlock Text="CALENDAR NAME" Classes="label"/><TextBox Text="{Binding Feeds[0].name,Mode=TwoWay}" PlaceholderText="Personal"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="SHARED ICS / WEBCAL URL" Classes="label"/><TextBox Text="{Binding Feeds[0].url,Mode=TwoWay}" PasswordChar="●" PlaceholderText="Paste subscription link"/></StackPanel></Grid>
+   <TextBlock Text="Use the shared/public link from iCloud. Apple account sign-in is not required." Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+  <Border Classes="section"><StackPanel Spacing="10">
+   <Grid ColumnDefinitions="*,Auto"><CheckBox Content="Google Calendar" IsChecked="{Binding Feeds[1].enabled,Mode=TwoWay}"/><Button Grid.Column="1" Classes="Ghost"  Command="{Binding OpenLinkCommand}" CommandParameter="https://support.google.com/calendar/answer/37648"><TextBlock Text="Setup guide ↗" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button></Grid>
+   <Grid ColumnDefinitions="190,16,*"><StackPanel><TextBlock Text="CALENDAR NAME" Classes="label"/><TextBox Text="{Binding Feeds[1].name,Mode=TwoWay}"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="SECRET ADDRESS IN ICAL FORMAT" Classes="label"/><TextBox Text="{Binding Feeds[1].url,Mode=TwoWay}" PasswordChar="●" PlaceholderText="Paste subscription link"/></StackPanel></Grid>
+   <TextBlock Text="Calendar settings → Integrate calendar → Secret address. Keep this link private." Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+  <Border Classes="section"><StackPanel Spacing="10">
+   <Grid ColumnDefinitions="*,Auto"><CheckBox Content="Microsoft Outlook" IsChecked="{Binding Feeds[2].enabled,Mode=TwoWay}"/><Button Grid.Column="1" Classes="Ghost"  Command="{Binding OpenLinkCommand}" CommandParameter="https://support.microsoft.com/en-us/outlook/share-your-calendar-in-outlook-on-the-web"><TextBlock Text="Setup guide ↗" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button></Grid>
+   <Grid ColumnDefinitions="190,16,*"><StackPanel><TextBlock Text="CALENDAR NAME" Classes="label"/><TextBox Text="{Binding Feeds[2].name,Mode=TwoWay}"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="PUBLISHED ICS URL" Classes="label"/><TextBox Text="{Binding Feeds[2].url,Mode=TwoWay}" PasswordChar="●" PlaceholderText="Paste subscription link"/></StackPanel></Grid>
+   <TextBlock Text="Calendar → Shared calendars → Publish → ICS. Your organization may limit publishing." Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+  <TextBlock Text="Subscription links are masked here and stored on the screen. Finnish holidays are built in." Classes="muted" FontSize="11" Margin="0,20,0,0"/>
+ </StackPanel>
+</UserControl>

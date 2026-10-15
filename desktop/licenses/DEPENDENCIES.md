@@ -1,0 +1,52 @@
+# Published dependencies
+
+IBM Plex Mono: OFL, see Assets/license.txt.
+
+- Avalonia 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia/12.1.0
+- Avalonia.Angle.Windows.Natives 2.1.27548.20260419 | LICENSE | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Angle.Windows.Natives/2.1.27548.20260419
+- Avalonia.BuildServices 11.3.2 | MIT | Copyright 2023-2025 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.BuildServices/11.3.2
+- Avalonia.Controls.ColorPicker 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Controls.ColorPicker/12.1.0
+- Avalonia.Controls.DataGrid 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Controls.DataGrid/12.1.0
+- Avalonia.Desktop 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Desktop/12.1.0
+- Avalonia.Fonts.Inter 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Fonts.Inter/12.1.0
+- Avalonia.FreeDesktop 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.FreeDesktop/12.1.0
+- Avalonia.FreeDesktop.AtSpi 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.FreeDesktop.AtSpi/12.1.0
+- Avalonia.HarfBuzz 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.HarfBuzz/12.1.0
+- Avalonia.Headless 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Headless/12.1.0
+- Avalonia.Native 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Native/12.1.0
+- Avalonia.Remote.Protocol 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Remote.Protocol/12.1.0
+- Avalonia.Skia 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Skia/12.1.0
+- Avalonia.Themes.Simple 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Themes.Simple/12.1.0
+- Avalonia.Win32 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.Win32/12.1.0
+- Avalonia.X11 12.1.0 | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://www.nuget.org/packages/Avalonia.X11/12.1.0
+- HarfBuzzSharp 8.3.1.3 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/HarfBuzzSharp/8.3.1.3
+- HarfBuzzSharp.NativeAssets.Linux 8.3.1.3 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.Linux/8.3.1.3
+- HarfBuzzSharp.NativeAssets.WebAssembly 8.3.1.3 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.WebAssembly/8.3.1.3
+- HarfBuzzSharp.NativeAssets.Win32 8.3.1.3 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.Win32/8.3.1.3
+- HarfBuzzSharp.NativeAssets.macOS 8.3.1.3 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/HarfBuzzSharp.NativeAssets.macOS/8.3.1.3
+- MicroCom.Runtime 0.11.6 | MIT | Copyright 2021 © Nikita Tsukanov | https://www.nuget.org/packages/MicroCom.Runtime/0.11.6
+- ShadUI 0.2.4 | MIT | accntech | https://www.nuget.org/packages/ShadUI/0.2.4
+- SkiaSharp 3.119.4 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/SkiaSharp/3.119.4
+- SkiaSharp.NativeAssets.Linux 3.119.4 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/SkiaSharp.NativeAssets.Linux/3.119.4
+- SkiaSharp.NativeAssets.WebAssembly 3.119.4 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/SkiaSharp.NativeAssets.WebAssembly/3.119.4
+- SkiaSharp.NativeAssets.Win32 3.119.4 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/SkiaSharp.NativeAssets.Win32/3.119.4
+- SkiaSharp.NativeAssets.macOS 3.119.4 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/SkiaSharp.NativeAssets.macOS/3.119.4
+- System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/System.IO.Ports/10.0.8
+- Tmds.DBus.Protocol 0.94.1 | MIT | Tom Deseyn | https://www.nuget.org/packages/Tmds.DBus.Protocol/0.94.1
+- runtime.android-arm.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.android-arm.runtime.native.System.IO.Ports/10.0.8
+- runtime.android-arm64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.android-arm64.runtime.native.System.IO.Ports/10.0.8
+- runtime.android-x64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.android-x64.runtime.native.System.IO.Ports/10.0.8
+- runtime.android-x86.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.android-x86.runtime.native.System.IO.Ports/10.0.8
+- runtime.linux-arm.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.linux-arm.runtime.native.System.IO.Ports/10.0.8
+- runtime.linux-arm64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.linux-arm64.runtime.native.System.IO.Ports/10.0.8
+- runtime.linux-bionic-arm64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.linux-bionic-arm64.runtime.native.System.IO.Ports/10.0.8
+- runtime.linux-bionic-x64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.linux-bionic-x64.runtime.native.System.IO.Ports/10.0.8
+- runtime.linux-musl-arm.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.linux-musl-arm.runtime.native.System.IO.Ports/10.0.8
+- runtime.linux-musl-arm64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.linux-musl-arm64.runtime.native.System.IO.Ports/10.0.8
+- runtime.linux-musl-x64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.linux-musl-x64.runtime.native.System.IO.Ports/10.0.8
+- runtime.linux-x64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.linux-x64.runtime.native.System.IO.Ports/10.0.8
+- runtime.maccatalyst-arm64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.maccatalyst-arm64.runtime.native.System.IO.Ports/10.0.8
+- runtime.maccatalyst-x64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.maccatalyst-x64.runtime.native.System.IO.Ports/10.0.8
+- runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.native.System.IO.Ports/10.0.8
+- runtime.osx-arm64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.osx-arm64.runtime.native.System.IO.Ports/10.0.8
+- runtime.osx-x64.runtime.native.System.IO.Ports 10.0.8 | MIT | © Microsoft Corporation. All rights reserved. | https://www.nuget.org/packages/runtime.osx-x64.runtime.native.System.IO.Ports/10.0.8

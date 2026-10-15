@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup>
+  <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
+  <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+  <PathMap>$(MSBuildProjectDirectory)=/_/InkOS.Studio</PathMap>
+  <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+  <AssemblyName>InkOS Studio</AssemblyName><Version>0.3.0</Version>
+  <ApplicationManifest>app.manifest</ApplicationManifest>
+  <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+  <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+ </PropertyGroup>
+ <ItemGroup>
+  <PackageReference Include="ShadUI" Version="0.2.4"/>
+  <PackageReference Include="Avalonia.Desktop" Version="12.1.0"/>
+  <PackageReference Include="Avalonia.Headless" Version="12.1.0"/>
+  <PackageReference Include="System.IO.Ports" Version="10.0.8"/>
+  <AvaloniaResource Include="Assets\*.ttf"/>
+  <Content Include="Assets\license.txt" CopyToOutputDirectory="PreserveNewest"/>
+  <Content Include="..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest"/>
+  <Content Include="..\README.md" Link="README.md" CopyToOutputDirectory="PreserveNewest"/>
+ </ItemGroup>
+</Project>
+

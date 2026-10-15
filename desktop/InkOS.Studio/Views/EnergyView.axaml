@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="InkOS.Studio.Views.EnergyView">
+ <StackPanel>
+  <TextBlock Text="ENERGY / 04" Classes="label"/><TextBlock Text="A clearer cost of power." Classes="title" Margin="0,0,0,10"/>
+  <TextBlock Text="Finland / FI. Current price on Home; a centred ±12-hour chart on Energy." Classes="muted" Margin="0,0,0,18"/>
+  <CheckBox Content="Show electricity prices" IsChecked="{Binding Energy.enabled,Mode=TwoWay}"/>
+  <Border Classes="section"><StackPanel Spacing="14">
+   <Grid ColumnDefinitions="*,18,*,18,*">
+    <StackPanel><TextBlock Text="VAT / %" Classes="label"/><TextBox x:Name="VatInput" Text="{Binding EnergyVatText,Mode=TwoWay}"/></StackPanel>
+    <StackPanel Grid.Column="2"><TextBlock Text="MARGIN / CT PER KWH" Classes="label"/><TextBox x:Name="MarginInput" Text="{Binding EnergyMarginText,Mode=TwoWay}"/></StackPanel>
+    <StackPanel Grid.Column="4"><TextBlock Text="TRANSMISSION / CT PER KWH" Classes="label"/><TextBox x:Name="TransmissionInput" Text="{Binding EnergyTransmissionText,Mode=TwoWay}"/></StackPanel>
+   </Grid>
+   <CheckBox x:Name="FeesTaxInput" Content="Margin and transmission already include VAT" IsChecked="{Binding Energy.fees_include_vat,Mode=TwoWay}"/>
+   <TextBlock x:Name="NetFeesFormula" Text="Total = (net spot + margin + transmission) × (1 + VAT / 100)" Classes="muted" IsVisible="{Binding !Energy.fees_include_vat}"/>
+   <TextBlock x:Name="GrossFeesFormula" Text="Total = net spot × (1 + VAT / 100) + margin + transmission" Classes="muted" IsVisible="{Binding Energy.fees_include_vat}"/>
+   <TextBlock Text="The screen's centre value is €/kWh. The full chart uses ct/kWh. Monthly fees and any additional taxes are outside this formula." Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+  <Border Classes="section"><StackPanel Spacing="12">
+   <StackPanel><TextBlock Text="DATA SOURCE / FI" Classes="label"/><ComboBox x:Name="EnergySourceInput" SelectedIndex="{Binding EnergyProviderIndex,Mode=TwoWay}"><ComboBoxItem Content="Sähkötin / net EUR per MWh / no key"/><ComboBoxItem Content="Pörssisähkö / VAT-included ct per kWh / no key"/><ComboBoxItem Content="Custom HTTPS / net ct per kWh / compatible JSON"/></ComboBox></StackPanel>
+   <StackPanel><TextBlock Text="API ENDPOINT" Classes="label"/><TextBox Text="{Binding Energy.endpoint,Mode=TwoWay}" IsReadOnly="{Binding !CustomEnergySource}" MaxLength="512"/></StackPanel>
+   <TextBlock Text="Preset adapters normalize prices to net ct/kWh before applying your VAT. Four complete 15-minute intervals form one hourly average. Missing and unpublished prices remain gaps." Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+  <Border Classes="section"><StackPanel Spacing="10" IsEnabled="{Binding CustomEnergySource}">
+   <Grid ColumnDefinitions="210,18,*"><StackPanel><TextBlock Text="OPTIONAL API HEADER" Classes="label"/><ComboBox ItemsSource="{Binding EnergyHeaders}" SelectedItem="{Binding Energy.api_header,Mode=TwoWay}"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="HEADER VALUE / BEARER TOKEN OR API KEY" Classes="label"/><TextBox Text="{Binding EnergyKeyText,Mode=TwoWay}" PasswordChar="●" MaxLength="256" PlaceholderText="Leave blank to keep the device's key"/></StackPanel></Grid>
+   <TextBlock Text="{Binding EnergyKeyStatus}" Classes="muted" FontSize="11"/><CheckBox Content="Remove the saved API key on next save" IsChecked="{Binding ClearEnergyKey,Mode=TwoWay}"/>
+   <TextBlock Text="Custom JSON: prices[] with price (net ct/kWh), startDate and endDate (ISO 8601). 15-minute or complete hourly intervals. HTTPS only; keys are never shown in diagnostics." Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+  <TextBlock Text="Data: Sähkötin / Pakastin Oy, or Porssisahko.net. Market data: Nord Pool. Sähkötin's free API is for personal, non-commercial use." Classes="muted" FontSize="11" Margin="0,18,0,0"/>
+ </StackPanel>
+</UserControl>

@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="InkOS.Studio.Views.SpotifyView">
+ <StackPanel>
+  <TextBlock Text="SPOTIFY / 03" Classes="label"/><TextBlock Text="Music, in the moment." Classes="title" Margin="0,0,0,10"/>
+  <TextBlock Text="Playback from your phone or speaker. Monochrome artwork. Timed lyrics." Classes="muted" Margin="0,0,0,28"/>
+  <Border BorderBrush="#DFDFDF" BorderThickness="1" CornerRadius="4" Padding="18" Margin="0,0,0,28"><StackPanel Spacing="8"><TextBlock Text="ACCOUNT ON THIS SCREEN" Classes="label"/><TextBlock Text="{Binding SpotifyStatus}" FontSize="15" TextWrapping="Wrap"/></StackPanel></Border>
+  <StackPanel Spacing="18">
+   <StackPanel Spacing="10"><TextBlock Text="01 / Create a Web API app with your Premium account." TextWrapping="Wrap"/><Button  Classes="Outline" HorizontalAlignment="Left" Command="{Binding OpenLinkCommand}" CommandParameter="https://developer.spotify.com/dashboard"><TextBlock Text="Developer Dashboard ↗" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button></StackPanel>
+   <StackPanel Spacing="8"><TextBlock Text="02 / Add this exact Redirect URI to your app." TextWrapping="Wrap"/><TextBox Text="{Binding RedirectUri}" IsReadOnly="True"/></StackPanel>
+   <StackPanel Spacing="8"><TextBlock Text="03 / Enter the Client ID, then authorize."/><TextBox Text="{Binding ClientId,Mode=TwoWay}" MaxLength="32" PlaceholderText="32-character Client ID"/><TextBlock Text="Client Secret is not needed." Classes="muted" FontSize="11"/></StackPanel>
+  </StackPanel>
+  <WrapPanel Orientation="Horizontal" Margin="0,24,0,0"><Button  Classes="Primary" Command="{Binding AuthorizeCommand}" Margin="0,0,10,10"><TextBlock Text="Authorize Spotify" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button><Button  Classes="Outline" Command="{Binding CancelAuthorizationCommand}" Margin="0,0,10,10"><TextBlock Text="Cancel" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button><Button  Classes="Ghost" Command="{Binding DisconnectSpotifyCommand}" Margin="0,0,0,10"><TextBlock Text="Disconnect" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button></WrapPanel>
+  <Border Classes="section"><TextBlock Text="Sign in securely in your browser using PKCE. The authorization token is sent over USB to the screen; no token file is saved on this computer." Classes="muted" FontSize="11"/></Border>
+  <TextBlock Text="Lyrics need a matching LRCLIB entry. The current font pack covers Latin and Finnish; CJK needs an additional font pack." Classes="muted" FontSize="11" Margin="0,16,0,0"/>
+ </StackPanel>
+</UserControl>

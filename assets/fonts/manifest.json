@@ -1,0 +1,34 @@
+{
+  "ui_family": "Terminus bitmap normal, <=24px; original hand-tuned one-bit grid, one-pixel stems",
+  "display_family": "IBM Plex Mono Light, >24px",
+  "source": "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-mono/fonts/complete/ttf/",
+  "bitmap_source": "https://terminus-font.sourceforge.net/",
+  "bitmap_version": "4.49.1",
+  "sizes": [
+    14,
+    16,
+    18,
+    20,
+    24,
+    28,
+    32,
+    48,
+    76,
+    96
+  ],
+  "raster": "Original BDF pixels for UI; FreeType native monochrome for display; no runtime scaling or antialiasing",
+  "glyphs_per_size": {
+    "14": 330,
+    "16": 330,
+    "18": 330,
+    "20": 330,
+    "24": 330,
+    "28": 330,
+    "32": 330,
+    "48": 330,
+    "76": 330,
+    "96": 330
+  },
+  "coverage": "ASCII, Latin-1, Latin Extended-A, selected punctuation; additional scripts need another font provider",
+  "checks": "Monospaced advances; ASCII/Finnish/degree coverage; one-pixel H stems at all UI sizes"
+}
