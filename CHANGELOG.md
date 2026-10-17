@@ -1,3 +1,12 @@
+# Firmware 0.7.7 / Studio 0.7.3 — Persistent device logs
+
+- Log ring v2: independent USB and flash readers on the 16 KiB non-blocking PSRAM ring, `log_tail`, runtime enable flag.
+- New `log-store` task (core 0, prio 1) writes the ring to `/logs/current.log` on the external LittleFS every 15 s or 8 KiB and rotates at 64 KiB into real ustar+gzip archives `inkos-NNNNNN.tar.gz` (ROM miniz deflate, streamed). Keeps ≤16 archives / 512 KiB and a 512 KiB free-space reserve.
+- `logging_enabled` setting (NVS `log_on`, default on): off makes `logf` a no-op and stops all log flash writes; applied immediately via `logging_set` or `settings_set`; reported in `status`.
+- Commands `log_list`, `log_read`, `log_tail`, `log_rotate`, `log_clear` over USB and paired IP. See [device logs](docs/LOGS.md).
+- Experimental `tools/build.py --usb-otg` image adds a read-only `INKOS_LOGS` USB drive (synthesized FAT12) composite with serial. Not the default: it changes the USB device/COM port and the esptool reset flow.
+- Studio 0.7.3: new Logs page (toggle, file list, .tar.gz viewer, filter, live tail, save, clear) and `--logs-smoke`.
+
 # Firmware 0.7.6 — Faster navigation refresh (experimental)
 
 - Log and report per-phase refresh timing (power-on, setup/SPI transfer, 0x12 waveform, power-off, total) on the `INKOS display` line, in `status` (`display_phase_us`) and `/display`.
