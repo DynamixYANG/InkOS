@@ -181,6 +181,7 @@ void displayTask(void *) {
   bool first=true, dirtyPending=true, prepared=false;
   for(;;) {
     if(panel.healthy()&&panel.frames) otaHeartbeat(0);
+    if(panel.powerHeld()) {Guard g(frameMutex);panel.idle();}
     uint8_t event;
     // Real input wakes this queue immediately; no fixed debounce before titles.
     // Idle only checks clocks/lyrics at 100ms, without copying the full model.
@@ -253,7 +254,8 @@ void displayTask(void *) {
       Guard g(frameMutex);
       bool animationOnly=snap->page==Page::Home&&!full&&!dirtyPending&&preparedToken.model==lastToken.model&&
           preparedToken.minute==lastToken.minute&&preparedToken.weather==lastToken.weather&&preparedToken.energy==lastToken.energy;
-      shown=panel.present(frame,full,animationOnly?RefreshMode::Animation:snap->page==Page::Music?RefreshMode::Music:RefreshMode::Clock);
+      shown=panel.present(frame,full,animationOnly?RefreshMode::Animation:snap->page==Page::Music?RefreshMode::Music:RefreshMode::Clock,
+                          navigation.pending());
     }
     if(!shown) {prepared=false;continue;}
     if(panel.healthy()&&panel.frames)otaHeartbeat(0);

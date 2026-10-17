@@ -165,7 +165,7 @@ bool Panel::begin() {
   reg(0x52, 0x0b);
   return powerOff();
 }
-bool Panel::present(const uint8_t *next, bool force, RefreshMode mode) {
+bool Panel::present(const uint8_t *next, bool force, RefreshMode mode, bool settledNavigation) {
   if (!ok)
     return false;
   int minx = 100, maxx = -1, miny = 480, maxy = -1;
@@ -192,6 +192,13 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode) {
   uint32_t start = millis();
   int64_t startUs = esp_timer_get_time();
   phases = {};
+  // Held drive power may only continue into another title preview or the
+  // settled full refresh. Anything else (body partials, maintenance full,
+  // animation) starts from the original powered-off state.
+  bool reused = held && powered && (navigation || (full && settledNavigation));
+  if (held && !reused && !powerOff())
+    return false;
+  held = false;
   if (full) {
     fullMode();
     if (!frames) {
@@ -251,7 +258,13 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode) {
       textPartials++;
   }
   // Power off retains RAM/registers while releasing source/gate/VCOM drive.
-  if (!powerOff())
+  // During a navigation sequence keep drive power on: the next title or the
+  // settled full refresh follows within the selection delay, saving one
+  // power-off/power-on pair. idle() bounds the held time.
+  if (navigation && holdNavigationPower.load()) {
+    held = true;
+    heldSinceMs = millis();
+  } else if (!powerOff())
     return false;
   memcpy(oldFrame, next, FRAME_BYTES);
   lastDuration = millis() - start;
@@ -260,7 +273,7 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode) {
   lastPhases = phases;
   frames++;
   Serial.printf("INKOS display mode=%s kind=%s ms=%lu partials=%lu x=%d y=%d w=%d h=%d wave=%s "
-                "on_us=%lu xfer_us=%lu wave_us=%lu off_us=%lu total_us=%lu\n",
+                "on_us=%lu xfer_us=%lu wave_us=%lu off_us=%lu total_us=%lu power=%s\n",
                 full ? "full" : "partial",
                 animation                    ? "animation"
                 : navigation                 ? "navigation"
@@ -270,7 +283,24 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode) {
                 lastRegion.w, lastRegion.h, fastTitle ? "nav500" : "otp",
                 (unsigned long)phases.powerOnUs, (unsigned long)phases.transferUs,
                 (unsigned long)phases.waveformUs, (unsigned long)phases.powerOffUs,
-                (unsigned long)phases.totalUs);
+                (unsigned long)phases.totalUs,
+                held ? "held" : reused ? "reused-off" : "off");
   return true;
+}
+void Panel::idle() {
+  if (!held)
+    return;
+  if (!powered) {
+    held = false;
+    return;
+  }
+  uint32_t age = millis() - heldSinceMs;
+  if (holdNavigationPower.load() && age < holdIdleMs.load())
+    return;
+  int64_t t = esp_timer_get_time();
+  bool done = powerOff();
+  held = false;
+  Serial.printf("INKOS display idle power-off held_ms=%lu off_us=%lu ok=%d\n", (unsigned long)age,
+                (unsigned long)(esp_timer_get_time() - t), done);
 }
 } // namespace ink

@@ -1,6 +1,7 @@
 #include "Services.h"
 #include "Zones.h"
 #include "CalDav.h"
+#include "Panel.h"
 #include <Preferences.h>
 #include <esp_timer.h>
 namespace ink {
@@ -18,6 +19,7 @@ static bool writeSettings(const Settings &s) {
   n.end();
   return written == sizeof s;
 }
+static void applyDisplayTuning(const Credentials &c);
 void loadConfiguration() {
   configMutex = xSemaphoreCreateMutex();
   Preferences n;
@@ -46,6 +48,9 @@ void loadConfiguration() {
     config.pageSwitchDelayMs = 500;
   config.encoderLockMs = n.getUInt("encoder_lock", 2000);
   if (config.encoderLockMs > 10000) config.encoderLockMs = 2000;
+  config.navHoldPower = n.getBool("nav_hold", true);
+  config.navIdleOffMs = n.getUInt("nav_idle", 3000);
+  if (config.navIdleOffMs < 500 || config.navIdleOffMs > 10000) config.navIdleOffMs = 3000;
   if (n.getBytesLength("settings2") == sizeof(Settings))
     n.getBytes("settings2", &config.settings, sizeof(Settings));
   auto energy = cJSON_Parse(n.getString("energy1", "").c_str());
@@ -94,6 +99,7 @@ void loadConfiguration() {
   model->settings = config.settings;
   model->pageSwitchDelayMs = config.pageSwitchDelayMs;
   model->encoderLockMs = config.encoderLockMs;
+  applyDisplayTuning(config);
   model->energy.enabled = config.energy.enabled;
   model->energy.marginCt = config.energy.marginCt;
   model->energy.vatPercent = config.energy.vatPercent;
@@ -140,6 +146,18 @@ void rotateToken(const String &t) {
   n.putString("refresh", t);
   n.end();
 }
+static void applyDisplayTuning(const Credentials &c) {
+  panel.holdNavigationPower = c.navHoldPower;
+  panel.holdIdleMs = c.navIdleOffMs;
+}
+static cJSON *displayTuning(const Credentials &c) {
+  auto out = cJSON_CreateObject();
+  cJSON_AddBoolToObject(out, "inkos", true);
+  cJSON_AddBoolToObject(out, "hold_power", c.navHoldPower);
+  cJSON_AddNumberToObject(out, "idle_off_ms", c.navIdleOffMs);
+  cJSON_AddBoolToObject(out, "panel_held", panel.powerHeld());
+  return out;
+}
 static cJSON *ack(bool ok, const char *message = "") {
   auto j = cJSON_CreateObject();
   cJSON_AddBoolToObject(j, "inkos", true);
@@ -148,6 +166,36 @@ static cJSON *ack(bool ok, const char *message = "") {
   return j;
 }
 cJSON *configurationCommand(const char *cmd, cJSON *j) {
+  if (!strcmp(cmd, "display_tuning_get")) return displayTuning(credentials());
+  if (!strcmp(cmd, "display_tuning_set")) {
+    Credentials next = credentials();
+    auto hold = cJSON_GetObjectItem(j, "hold_power"), idle = cJSON_GetObjectItem(j, "idle_off_ms");
+    if (hold) {
+      if (!cJSON_IsBool(hold)) return ack(false, "hold_power must be true or false");
+      next.navHoldPower = cJSON_IsTrue(hold);
+    }
+    if (idle) {
+      if (!cJSON_IsNumber(idle) || !isfinite(idle->valuedouble) || idle->valuedouble < 500 ||
+          idle->valuedouble > 10000 || idle->valuedouble != idle->valueint)
+        return ack(false, "idle_off_ms must be 500-10000 integer milliseconds");
+      next.navIdleOffMs = idle->valueint;
+    }
+    {
+      Guard g(configMutex);
+      Preferences n;
+      if (!n.begin("inkos", false)) return ack(false, "Could not save display tuning");
+      bool saved = n.putBool("nav_hold", next.navHoldPower) == 1 &&
+                   n.putUInt("nav_idle", next.navIdleOffMs) == sizeof(uint32_t);
+      n.end();
+      if (!saved) return ack(false, "Could not save display tuning");
+      config.navHoldPower = next.navHoldPower;
+      config.navIdleOffMs = next.navIdleOffMs;
+      applyDisplayTuning(config);
+    }
+    auto out = displayTuning(credentials());
+    cJSON_AddBoolToObject(out, "saved", true);
+    return out;
+  }
   if (!strcmp(cmd,"icloud_get")) {
     auto v=credentials().icloud;auto out=cJSON_CreateObject();cJSON_AddBoolToObject(out,"inkos",true);
     cJSON_AddBoolToObject(out,"enabled",v.enabled);cJSON_AddBoolToObject(out,"has_password",v.password.length()>0);
