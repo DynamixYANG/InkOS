@@ -1,3 +1,4 @@
+#include "Log.h"
 #include "Energy.h"
 #include "Services.h"
 #include "Zones.h"
@@ -291,7 +292,7 @@ void updateEnergy() {
     Guard g(modelMutex);
     model->energy = *e;
   }
-  Serial.printf("INKOS energy valid=%d hours=%d\n", success, e->count);
+  logf("INKOS energy valid=%d hours=%d\n", success, e->count);
   free(e);
   invalidate();
 }

@@ -4,6 +4,7 @@
 - Keep panel drive power on across a navigation sequence; the settled full refresh or next title reuses it, any other refresh powers off first, and an idle timeout (default 3000 ms) forces power-off.
 - Use the fast OTP full waveform (E0=0x02, E5=0x5A) only for the full refresh that commits a navigation selection. Boot, recovery and maintenance fulls stay standard; every 8th consecutive settled full and the 30-minute maintenance timer use the standard waveform.
 - Send full frames in one SPI burst, drop the redundant post-refresh DTM1 rewrite (N2OCP is set), and replace fixed 2 ms command delays with an edge-driven BUSY wait. SPI stays at 10 MHz.
+- Fix a pre-existing (0.7.x) sticky slowdown: once the 4 KB USB TX buffer filled while USB stayed plugged but no program read the port, every display/network diagnostic `Serial.printf` blocked up to 2 s (HWCDC backpressure), delaying titles and settled pages by many seconds until reboot. Task diagnostics now use a non-blocking `logf()` that drops lines when the buffer is full (`status.log_dropped`); command responses are unchanged.
 - New `display_tuning_get` / `display_tuning_set` commands (`hold_power`, `fast_full`, `idle_off_ms`) in separate NVS keys; Studio 0.7.2 remains compatible. Ghosting, low-temperature behaviour and long-held drive power require physical validation.
 
 # Firmware 0.7.5 — Thin rounded weather symbols

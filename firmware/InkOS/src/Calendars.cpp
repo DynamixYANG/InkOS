@@ -1,3 +1,4 @@
+#include "Log.h"
 #include "ICalendar.h"
 #include "CalendarLayout.h"
 #include "CalDav.h"
@@ -207,7 +208,7 @@ void updateCalendars() {
       if (ok)
         LittleFS.rename("/agenda.bin.next", "/agenda.bin");
     }
-    Serial.printf("INKOS calendar events=%d stale=%d truncated=%d\n", result->count, result->stale,
+    logf("INKOS calendar events=%d stale=%d truncated=%d\n", result->count, result->stale,
                   result->truncated);
   } else {
     Guard g(modelMutex);

@@ -1,5 +1,6 @@
 #include "Panel.h"
 #include "NavigationWaveform.h"
+#include "Log.h"
 #include <algorithm>
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
@@ -41,7 +42,7 @@ bool Panel::ready(uint32_t timeout) {
   while (digitalRead(BUSY) == LOW) {
     if (millis() - start >= timeout) {
       ok = false;
-      Serial.println("INKOS panel timeout");
+      logf("INKOS panel timeout\n");
       return false;
     }
     if (busySignal)
@@ -324,7 +325,7 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode, bool sett
   phases.transferUs = phases.totalUs - phases.powerOnUs - phases.waveformUs - phases.powerOffUs;
   lastPhases = phases;
   frames++;
-  Serial.printf("INKOS display mode=%s kind=%s ms=%lu partials=%lu x=%d y=%d w=%d h=%d wave=%s "
+  logf("INKOS display mode=%s kind=%s ms=%lu partials=%lu x=%d y=%d w=%d h=%d wave=%s "
                 "on_us=%lu xfer_us=%lu wave_us=%lu off_us=%lu total_us=%lu power=%s\n",
                 full ? "full" : "partial",
                 animation                    ? "animation"
@@ -352,7 +353,7 @@ void Panel::idle() {
   int64_t t = esp_timer_get_time();
   bool done = powerOff();
   held = false;
-  Serial.printf("INKOS display idle power-off held_ms=%lu off_us=%lu ok=%d\n", (unsigned long)age,
+  logf("INKOS display idle power-off held_ms=%lu off_us=%lu ok=%d\n", (unsigned long)age,
                 (unsigned long)(esp_timer_get_time() - t), done);
 }
 } // namespace ink

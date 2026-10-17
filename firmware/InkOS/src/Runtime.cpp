@@ -13,6 +13,7 @@
 #include "LyricsResolver.h"
 #include "RemoteConfiguration.h"
 #include "Zones.h"
+#include "Log.h"
 #include <Preferences.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -49,7 +50,7 @@ void networkTask(void *) {
   uint32_t cfgRevision = ~0u, wifiRevision = ~0u;
   Weather *weather = (Weather *)heap_caps_malloc(sizeof(Weather), MALLOC_CAP_SPIRAM);
   if (!weather) {
-    Serial.println("INKOS weather allocation failed");
+    logf("INKOS weather allocation failed\n");
     vTaskDelete(nullptr);
     return;
   }
@@ -75,7 +76,7 @@ void networkTask(void *) {
       lastAttempt = millis();
       if (cfg.ssid.length()) {
         WiFi.begin(cfg.ssid.c_str(), cfg.password.c_str());
-        Serial.println("INKOS WiFi connecting");
+        logf("INKOS WiFi connecting\n");
       }
     }
     if (connected != wasConnected) {
@@ -91,7 +92,7 @@ void networkTask(void *) {
       invalidate();
       if (connected) {
         configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
-        Serial.printf("INKOS WiFi online ip=%s\n", WiFi.localIP().toString().c_str());
+        logf("INKOS WiFi online ip=%s\n", WiFi.localIP().toString().c_str());
       }
     }
     if (connected && Clock::valid()) {
@@ -108,7 +109,7 @@ void networkTask(void *) {
           Guard g(modelMutex);
           memcpy(&model->weather, weather, sizeof(Weather));
         }
-        Serial.printf("INKOS weather valid=%d hours=%d\n", success, weather->hourCount);
+        logf("INKOS weather valid=%d hours=%d\n", success, weather->hourCount);
         invalidate();
         if (!success)
           lastWeather = millis() - 840000;
@@ -170,9 +171,9 @@ void renderPage(Canvas &c, Model &m, time_t now, int64_t us, int64_t tick) {
 void displayTask(void *) {
   auto frame=(uint8_t*)heap_caps_malloc(FRAME_BYTES,MALLOC_CAP_SPIRAM);
   auto snap=(Model*)heap_caps_malloc(sizeof(Model),MALLOC_CAP_SPIRAM);
-  if(!frame || !snap) {Serial.println("INKOS render allocation failed");vTaskDelete(nullptr);return;}
+  if(!frame || !snap) {logf("INKOS render allocation failed\n");vTaskDelete(nullptr);return;}
   new(snap) Model();
-  if(!panel.begin()) {Serial.println("INKOS display init failed");vTaskDelete(nullptr);return;}
+  if(!panel.begin()) {logf("INKOS display init failed\n");vTaskDelete(nullptr);return;}
   Canvas c(frame);
   Page lastPage=Page::Forecast;
   PageNavigation navigation;
@@ -208,14 +209,14 @@ void displayTask(void *) {
             Guard g(frameMutex);
             int64_t dispatch=esp_timer_get_time();
             navigationDispatchUs=uint32_t(std::max(int64_t(0),dispatch-state.requestedUs));
-            Serial.printf("INKOS navigation dispatch page=%d sequence=%lu age_us=%lu\n",int(state.page),(unsigned long)state.token.navigation,(unsigned long)navigationDispatchUs.load());
+            logf("INKOS navigation dispatch page=%d sequence=%lu age_us=%lu\n",int(state.page),(unsigned long)state.token.navigation,(unsigned long)navigationDispatchUs.load());
             shown=panel.present(frame,false,RefreshMode::Navigation);
           }
           if(shown) {
             int64_t completed=esp_timer_get_time();
             navigation.previewed(int(state.page),completed);
             navigationTitleUs=uint32_t(std::max(int64_t(0),completed-state.requestedUs));
-            Serial.printf("INKOS navigation preview page=%d sequence=%lu\n",int(state.page),(unsigned long)state.token.navigation);
+            logf("INKOS navigation preview page=%d sequence=%lu\n",int(state.page),(unsigned long)state.token.navigation);
           }
           continue; // Take the newest target after an in-flight waveform.
         }
@@ -247,7 +248,7 @@ void displayTask(void *) {
     }
     if(navigation.pending()) {
       navigationAcceptUs=uint32_t(std::max(int64_t(0),esp_timer_get_time()-state.requestedUs));
-      Serial.printf("INKOS navigation accepted page=%d lock_ms=%lu age_us=%lu\n",int(snap->page),(unsigned long)state.lockMs,(unsigned long)navigationAcceptUs.load());
+      logf("INKOS navigation accepted page=%d lock_ms=%lu age_us=%lu\n",int(snap->page),(unsigned long)state.lockMs,(unsigned long)navigationAcceptUs.load());
     }
     bool shown;
     {
@@ -259,7 +260,7 @@ void displayTask(void *) {
     }
     if(!shown) {prepared=false;continue;}
     if(panel.healthy()&&panel.frames)otaHeartbeat(0);
-    if(navigation.pending())Serial.printf("INKOS navigation committed page=%d sequence=%lu\n",int(snap->page),(unsigned long)snap->navigationRevision);
+    if(navigation.pending())logf("INKOS navigation committed page=%d sequence=%lu\n",int(snap->page),(unsigned long)snap->navigationRevision);
     navigation.committed(int(snap->page));
     lastPage=snap->page;lastToken=preparedToken;
     first=false;dirtyPending=false;prepared=false;background.clear();
@@ -284,6 +285,7 @@ static cJSON *deviceStatus() {
   cJSON_AddNumberToObject(out, "navigation_title_us", navigationTitleUs.load());
   cJSON_AddNumberToObject(out, "navigation_accept_us", navigationAcceptUs.load());
   cJSON_AddNumberToObject(out, "render_snapshots", renderSnapshots.load());
+  cJSON_AddNumberToObject(out, "log_dropped", droppedLogLines());
   {
     // Diagnostic copy without frameMutex: never block modelMutex holders behind
     // a 4 s full refresh. A concurrent present() can at worst mix two samples.
