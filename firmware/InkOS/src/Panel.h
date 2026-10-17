@@ -24,6 +24,7 @@ class Panel {
   void data(const uint8_t *, size_t);
   void reg(uint8_t, uint8_t);
   bool ready(uint32_t);
+  void busyStarted();
   bool refresh(uint32_t);
   bool powerOn();
   bool powerOff();

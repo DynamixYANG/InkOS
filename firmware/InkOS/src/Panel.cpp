@@ -6,6 +6,16 @@
 namespace ink {
 Panel panel;
 constexpr int CS = 44, DC = 10, RST = 38, BUSY = 4;
+// BUSY_N rising edge (controller ready) wakes the waiting display task early.
+// The 2 ms poll in ready() remains as a fallback, so a missed edge only costs
+// the previous polling latency.
+static SemaphoreHandle_t busySignal = nullptr;
+static void IRAM_ATTR busyReady() {
+  BaseType_t woken = pdFALSE;
+  xSemaphoreGiveFromISR(busySignal, &woken);
+  if (woken)
+    portYIELD_FROM_ISR();
+}
 void Panel::command(uint8_t v) {
   spi.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0));
   digitalWrite(DC, LOW);
@@ -34,16 +44,29 @@ bool Panel::ready(uint32_t timeout) {
       Serial.println("INKOS panel timeout");
       return false;
     }
-    vTaskDelay(pdMS_TO_TICKS(2));
+    if (busySignal)
+      xSemaphoreTake(busySignal, pdMS_TO_TICKS(2));
+    else
+      vTaskDelay(pdMS_TO_TICKS(2));
   }
   return true;
+}
+// BUSY_N falls within microseconds of 0x04/0x02/0x12. Wait for that edge for
+// at most the previous fixed 2 ms delay instead of always sleeping 2 ms, then
+// discard any stale ready signal before ready() waits for the rising edge.
+void Panel::busyStarted() {
+  uint32_t t = micros();
+  while (digitalRead(BUSY) == HIGH && micros() - t < 2000)
+    delayMicroseconds(10);
+  if (busySignal)
+    xSemaphoreTake(busySignal, 0);
 }
 bool Panel::refresh(uint32_t limit) {
   if (!powerOn())
     return false;
   int64_t t = esp_timer_get_time();
   command(0x12);
-  delay(2);
+  busyStarted();
   bool done = ready(limit);
   phases.waveformUs += uint32_t(esp_timer_get_time() - t);
   return done;
@@ -53,7 +76,7 @@ bool Panel::powerOn() {
     return true;
   int64_t t = esp_timer_get_time();
   command(0x04);
-  delay(2);
+  busyStarted();
   bool done = ready(15000);
   phases.powerOnUs += uint32_t(esp_timer_get_time() - t);
   if (!done)
@@ -66,7 +89,7 @@ bool Panel::powerOff() {
     return true;
   int64_t t = esp_timer_get_time();
   command(0x02);
-  delay(2);
+  busyStarted();
   bool done = ready(15000);
   phases.powerOffUs += uint32_t(esp_timer_get_time() - t);
   if (!done)
@@ -150,6 +173,10 @@ bool Panel::begin() {
   pinMode(DC, OUTPUT);
   pinMode(RST, OUTPUT);
   pinMode(BUSY, INPUT);
+  if (!busySignal)
+    busySignal = xSemaphoreCreateBinary();
+  if (busySignal)
+    attachInterrupt(digitalPinToInterrupt(BUSY), busyReady, RISING);
   digitalWrite(RST, LOW);
   delay(20);
   digitalWrite(RST, HIGH);
