@@ -14,6 +14,8 @@
 #include "RemoteConfiguration.h"
 #include "Zones.h"
 #include "Log.h"
+#include "LogStore.h"
+#include "UsbLogDisk.h"
 #include <Preferences.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -23,6 +25,7 @@
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
 #include <new>
+#include <esp_system.h>
 namespace ink {
 static SemaphoreHandle_t frameMutex = nullptr;
 static std::atomic<uint32_t> navigationDispatchUs{0}, navigationTitleUs{0}, navigationAcceptUs{0}, renderSnapshots{0};
@@ -268,7 +271,7 @@ void displayTask(void *) {
 }
 static cJSON *deviceStatus() {
   Guard g(modelMutex); auto out = cJSON_CreateObject();
-  cJSON_AddBoolToObject(out, "inkos", true); cJSON_AddStringToObject(out, "version", "0.7.6");
+  cJSON_AddBoolToObject(out, "inkos", true); cJSON_AddStringToObject(out, "version", "0.7.7");
   cJSON_AddNumberToObject(out, "page", int(model->page)); cJSON_AddBoolToObject(out, "wifi", model->wifi);
   cJSON_AddStringToObject(out, "ip", model->ip); cJSON_AddBoolToObject(out, "spotify", model->music.authorized);
   cJSON_AddBoolToObject(out, "weather", model->weather.valid);
@@ -287,6 +290,9 @@ static cJSON *deviceStatus() {
   cJSON_AddNumberToObject(out, "render_snapshots", renderSnapshots.load());
   cJSON_AddNumberToObject(out, "log_dropped", droppedLogLines()); // Oldest lines evicted.
   cJSON_AddNumberToObject(out, "log_buffered", bufferedLogBytes());
+  cJSON_AddBoolToObject(out, "logging_enabled", loggingEnabled());
+  cJSON_AddBoolToObject(out, "log_disk", usbLogDiskAvailable());
+  cJSON_AddNumberToObject(out, "log_file_dropped", droppedFileLogLines());
   {
     // Diagnostic copy without frameMutex: never block modelMutex holders behind
     // a 4 s full refresh. A concurrent present() can at worst mix two samples.
@@ -321,6 +327,7 @@ String executeCommand(cJSON *j, bool usb) {
   else if (usb && !strcmp(cmd, "lyrics_status")) out = lyricsDiagnostics();
   else if (usb && !strcmp(cmd, "lyrics_probe")) out = lyricProbeCommand(j);
   else if ((out = otaCommand(cmd,j))) {}
+  else if ((out = logCommand(cmd,j))) {}
   else if (otaBusy()) {out=cJSON_CreateObject();cJSON_AddBoolToObject(out,"saved",false);cJSON_AddStringToObject(out,"message","OTA in progress; configuration is paused");}
   else if (usb && !strcmp(cmd,"storage_check")) {out=cJSON_CreateObject();cJSON_AddBoolToObject(out,"ok",checkStorage());}
   else if ((out = configurationCommand(cmd, j))) {}
@@ -339,9 +346,6 @@ String executeCommand(cJSON *j, bool usb) {
     } else if (!strcmp(action, "home")) selectPage(0);
     else if (!strcmp(action, "prev") || !strcmp(action, "next")) navigatePage(!strcmp(action, "prev") ? -1 : 1);
     else return "{\"inkos\":true,\"saved\":false,\"message\":\"Invalid navigation\"}";
-    out = cJSON_CreateObject(); cJSON_AddBoolToObject(out, "ok", true);
-  } else if (usb && !strcmp(cmd, "log_clear")) {
-    clearLog();
     out = cJSON_CreateObject(); cJSON_AddBoolToObject(out, "ok", true);
   } else if (usb && !strcmp(cmd, "icon_test")) {
     auto code = cJSON_GetObjectItem(j, "code"); Guard g(modelMutex);
@@ -442,7 +446,7 @@ void controlTask(void *) {
     {
       Guard g(modelMutex);
       snprintf(b, sizeof b,
-               "{\"version\":\"0.7.6\",\"page\":%d,\"wifi\":%s,\"weather\":%s,\"spotify\":%s,"
+               "{\"version\":\"0.7.7\",\"page\":%d,\"wifi\":%s,\"weather\":%s,\"spotify\":%s,"
                "\"time\":%lld,\"weather_provider\":%d,\"hours\":%d,\"calendar_configured\":%s,"
                "\"calendar_events\":%d,\"calendar_stale\":%s,\"pages\":7,\"energy\":%s,\"energy_"
                "hours\":%d}",
@@ -599,7 +603,9 @@ void controlTask(void *) {
 }
 void start() {
   Serial.setRxBufferSize(8192);
+#if ARDUINO_USB_MODE
   Serial.setTxBufferSize(4096);
+#endif
   Serial.begin(115200);
   beginLog();
   delay(1200);
@@ -624,6 +630,8 @@ void start() {
   cJSON_InitHooks(&hooks);
   loadConfiguration();
   ensureStorage();
+  startLogStore();
+  startUsbLogDisk();
   loadAgenda();
   loadEnergy();
   extern bool selfTest();
@@ -638,7 +646,8 @@ void start() {
   xTaskCreatePinnedToCore(networkTask, "network", 16384, nullptr, 1, nullptr, 0);
   xTaskCreatePinnedToCore(inputTask, "input", 3072, nullptr, 3, nullptr, 1);
   xTaskCreatePinnedToCore(controlTask, "control", 12288, nullptr, 1, nullptr, 1);
-  Serial.printf("INKOS boot version=0.7.6 psram=%u bytes model=%u bytes\n", ESP.getPsramSize(),
+  Serial.printf("INKOS boot version=0.7.7 psram=%u bytes model=%u bytes\n", ESP.getPsramSize(),
                 unsigned(sizeof(Model)));
+  logf("INKOS boot version=0.7.7 reset=%d\n", int(esp_reset_reason()));
 }
 } // namespace ink

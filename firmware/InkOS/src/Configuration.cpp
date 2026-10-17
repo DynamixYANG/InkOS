@@ -2,6 +2,8 @@
 #include "Zones.h"
 #include "CalDav.h"
 #include "Panel.h"
+#include "Log.h"
+#include "LogStore.h"
 #include <Preferences.h>
 #include <esp_timer.h>
 namespace ink {
@@ -50,6 +52,8 @@ void loadConfiguration() {
   if (config.encoderLockMs > 10000) config.encoderLockMs = 2000;
   config.navHoldPower = n.getBool("nav_hold", true);
   config.navFastFull = n.getBool("nav_fast", true);
+  config.loggingEnabled = n.getBool("log_on", true);
+  setLoggingEnabled(config.loggingEnabled);
   config.navIdleOffMs = n.getUInt("nav_idle", 3000);
   if (config.navIdleOffMs < 500 || config.navIdleOffMs > 10000) config.navIdleOffMs = 3000;
   if (n.getBytesLength("settings2") == sizeof(Settings))
@@ -401,6 +405,7 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
     cJSON_AddBoolToObject(s, "animations", v.animations);
     cJSON_AddNumberToObject(s, "page_switch_delay_ms", cfg.pageSwitchDelayMs);
     cJSON_AddNumberToObject(s, "encoder_lock_ms", cfg.encoderLockMs);
+    cJSON_AddBoolToObject(s, "logging_enabled", cfg.loggingEnabled);
     cJSON_AddStringToObject(s, "met_contact", v.metContact);
     auto worlds = cJSON_AddArrayToObject(s, "worlds");
     for (auto &w : v.worlds) {
@@ -424,6 +429,7 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
     auto current = credentials();
     Settings v = current.settings;
     uint32_t pageDelay = current.pageSwitchDelayMs, encoderLock = current.encoderLockMs;
+    bool logging = current.loggingEnabled;
     auto s = cJSON_GetObjectItem(j, "settings");
     if (!cJSON_IsObject(s)) {
       return ack(false, "Missing settings");
@@ -443,6 +449,11 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
           lockField->valuedouble != lockField->valueint)
         return ack(false, "Encoder lock must be 0-10000 integer milliseconds");
       encoderLock = lockField->valueint;
+    }
+    auto loggingField = cJSON_GetObjectItem(s, "logging_enabled");
+    if (loggingField) {
+      if (!cJSON_IsBool(loggingField)) return ack(false, "logging_enabled must be true or false");
+      logging = cJSON_IsTrue(loggingField);
     }
     strlcpy(v.location, stringAt(s, "location"), sizeof v.location);
     strlcpy(v.localZone, stringAt(s, "zone"), sizeof v.localZone);
@@ -494,10 +505,21 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
         n.end();
         if (!saved) return ack(false, "Could not save encoder lock");
       }
+      if (logging != config.loggingEnabled) {
+        Preferences n;
+        if (!n.begin("inkos", false)) return ack(false, "Could not save logging setting");
+        bool saved = n.putBool("log_on", logging) == 1;
+        n.end();
+        if (!saved) return ack(false, "Could not save logging setting");
+      }
       config.encoderLockMs = encoderLock;
       config.settings = v;
       config.pageSwitchDelayMs = pageDelay;
       config.revision++;
+    }
+    if (logging != current.loggingEnabled) {
+      {Guard g(configMutex); config.loggingEnabled = logging;}
+      applyLoggingEnabled(logging); // Takes effect now; flushes on disable.
     }
     {
       Guard g(modelMutex);

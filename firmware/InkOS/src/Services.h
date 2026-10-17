@@ -27,6 +27,7 @@ struct Credentials {
   uint32_t pageSwitchDelayMs = 500, encoderLockMs = 2000; // Separate NVS key; preserve settings2 binary ABI.
   // Display tuning, separate NVS keys "nav_hold"/"nav_idle"/"nav_fast" (absent: defaults).
   bool navHoldPower = true, navFastFull = true;
+  bool loggingEnabled = true; // NVS "log_on": diagnostics ring + /logs files.
   uint32_t navIdleOffMs = 3000;
   EnergyConfig energy;
   ICloudConfig icloud;
