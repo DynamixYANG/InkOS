@@ -75,14 +75,19 @@ bool Panel::powerOff() {
   return true;
 }
 void Panel::writeFull(const uint8_t *p) {
-  for (int y = 0; y < 480; y++)
-    data(p + y * 100, 100);
+  // One CS-low burst instead of 480 row transactions.
+  data(p, FRAME_BYTES);
 }
 void Panel::solid(uint8_t v) {
   uint8_t row[100];
   memset(row, v, 100);
+  spi.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0));
+  digitalWrite(DC, HIGH);
+  digitalWrite(CS, LOW);
   for (int y = 0; y < 480; y++)
-    data(row, 100);
+    spi.writeBytes(row, 100);
+  digitalWrite(CS, HIGH);
+  spi.endTransaction();
 }
 void Panel::fullMode(bool fast) {
   command(0x92);
@@ -229,8 +234,9 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode, bool sett
     writeFull(next);
     if (!refresh(20000))
       return false;
-    command(0x10);
-    writeFull(next);
+    // No post-refresh DTM1 (0x10) rewrite: R50 sets N2OCP (0x29/0xa9 bit 3),
+    // and every later path writes DTM1 itself before 0x12 (full: white;
+    // partial/title: the old window from oldFrame), so it is never consumed.
     partials = 0;
     textPartials = animationPartials = 0;
     fullFrames++;
