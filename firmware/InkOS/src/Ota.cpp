@@ -19,7 +19,7 @@
 // self-test and panel checks run. Defer confirmation to supervise() below.
 extern "C" bool verifyRollbackLater(){return true;}
 namespace ink {
-constexpr char LAYOUT[]="inkos-ab594-extfs-v2",BOARD[]="xiao-esp32s3-plus-16m",VERSION[]="0.7.7";
+constexpr char LAYOUT[]="inkos-ab594-extfs-v2",BOARD[]="xiao-esp32s3-plus-16m",VERSION[]="0.7.8";
 static std::atomic<uint32_t> beats[3];
 static std::atomic<bool> startup{false},uploading{false},confirmed{false};
 static uint32_t bootId;

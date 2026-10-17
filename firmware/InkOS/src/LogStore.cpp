@@ -1,12 +1,15 @@
 #include "LogStore.h"
+#include "CjkAssetsData.h"
 #include "Log.h"
 #include "Storage.h"
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <algorithm>
 #include <atomic>
+#include <array>
 #include <vector>
 #include <esp_heap_caps.h>
+#include <esp_partition.h>
 #include <mbedtls/base64.h>
 #include <miniz.h>
 #include <time.h>
@@ -14,13 +17,15 @@ namespace ink {
 namespace {
 constexpr char Dir[] = "/logs", Current[] = "/logs/current.log", Temp[] = "/logs/.rotate.tmp";
 constexpr size_t BatchBytes = 16384, ReadChunkMax = 2048, TailMax = 3072;
-constexpr uint32_t FlushMs = 15000;
+constexpr int ListMax = LogArchiveMaxFiles + 16, DeleteMax = 64;
+constexpr uint32_t FlushMs = 15000, DaySeconds = 86400, BlockBytes = 4096;
 TaskHandle_t writer = nullptr;
-std::atomic<bool> hostActive{false}, clearRequested{false}, ready{false};
-std::atomic<uint32_t> discarded{0}, rotations{0}, flushes{0};
-SemaphoreHandle_t fsLock = nullptr; // Serialises writer vs. clear/list/read.
-uint32_t nextSeq = 1;
+std::atomic<bool> clearRequested{false}, rotateRequested{false}, pruneRequested{true}, ready{false};
+std::atomic<uint32_t> discarded{0}, rotations{0}, flushes{0}, pruned{0};
+std::atomic<uint16_t> retention{LogRetentionDefaultDays};
 std::atomic<const char *> lastError{""}; // Last rotation failure stage, for log_list.
+SemaphoreHandle_t fsLock = nullptr; // Serialises writer vs. clear/delete/list/read/fs_info.
+uint32_t nextSeq = 1, lastAgePrune = 0;
 struct Lock {
   Lock() { xSemaphoreTake(fsLock, portMAX_DELAY); }
   ~Lock() { xSemaphoreGive(fsLock); }
@@ -29,30 +34,31 @@ void notifyWriter() {
   if (writer)
     xTaskNotifyGive(writer);
 }
-bool archiveName(const char *name, uint32_t *seq) {
-  unsigned v = 0;
-  int consumed = 0;
-  if (sscanf(name, "inkos-%6u.tar.gz%n", &v, &consumed) != 1 || name[consumed])
-    return false;
-  if (seq)
-    *seq = v;
-  return true;
-}
-bool validName(const char *name) {
-  return !strcmp(name, "current.log") || archiveName(name, nullptr);
+uint32_t nowUnix() {
+  time_t t = time(nullptr);
+  return t >= time_t(ClockValidAfter) ? uint32_t(t) : 0;
 }
 uint32_t fsFree() {
   size_t total = LittleFS.totalBytes(), used = LittleFS.usedBytes();
   return total > used ? total - used : 0;
 }
+uint32_t blocks(uint32_t bytes) { return (bytes + BlockBytes - 1) / BlockBytes * BlockBytes; }
+// Listing buffer in PSRAM: up to ~216 entries would not fit on task stacks.
+struct Listing {
+  LogFileInfo *items = (LogFileInfo *)heap_caps_malloc(sizeof(LogFileInfo) * ListMax, MALLOC_CAP_SPIRAM);
+  int n = 0;
+  ~Listing() { free(items); }
+};
 int listUnlocked(LogFileInfo *out, int max) {
+  if (!out)
+    return 0;
   File dir = LittleFS.open(Dir);
   if (!dir || !dir.isDirectory())
     return 0;
   int n = 0;
   for (File f = dir.openNextFile(); f && n < max; f = dir.openNextFile()) {
     const char *name = f.name();
-    if (!f.isDirectory() && validName(name)) {
+    if (!f.isDirectory() && validLogName(name)) {
       strlcpy(out[n].name, name, sizeof out[n].name);
       out[n].size = f.size();
       out[n].mtime = f.getLastWrite();
@@ -63,34 +69,74 @@ int listUnlocked(LogFileInfo *out, int max) {
   // Archives by sequence, current.log last.
   std::sort(out, out + n, [](const LogFileInfo &a, const LogFileInfo &b) {
     uint32_t x = UINT32_MAX, y = UINT32_MAX;
-    archiveName(a.name, &x);
-    archiveName(b.name, &y);
+    logArchiveSeq(a.name, &x);
+    logArchiveSeq(b.name, &y);
     return x < y;
   });
   return n;
 }
-void enforceRetention() {
-  if (hostActive)
-    return;
-  LogFileInfo files[LogArchiveLimit + 8];
-  int n = listUnlocked(files, LogArchiveLimit + 8), archives = 0;
-  uint32_t bytes = 0;
+// Rotation time: the file's mtime, else the gzip header MTIME written at rotation.
+uint32_t archiveEnd(const LogFileInfo &f) {
+  if (f.mtime >= ClockValidAfter)
+    return f.mtime;
+  char path[48];
+  snprintf(path, sizeof path, "%s/%s", Dir, f.name);
+  File in = LittleFS.open(path, "r");
+  uint8_t h[8] = {};
+  bool ok = in && in.read(h, sizeof h) == sizeof h && h[0] == 0x1f && h[1] == 0x8b;
+  in.close();
+  uint32_t t = ok ? uint32_t(h[4]) | uint32_t(h[5]) << 8 | uint32_t(h[6]) << 16 | uint32_t(h[7]) << 24 : 0;
+  return t >= ClockValidAfter ? t : 0;
+}
+struct Budget {
+  uint64_t total, used, logBytes;
+  uint32_t budget;
+};
+Budget budgetFor(const LogFileInfo *files, int n) {
+  Budget b{LittleFS.totalBytes(), LittleFS.usedBytes(), 0, 0};
   for (int i = 0; i < n; i++)
-    if (archiveName(files[i].name, nullptr)) {
-      archives++;
-      bytes += files[i].size;
-    }
-  for (int i = 0; i < n && (archives > int(LogArchiveLimit) || bytes > LogArchiveBytes ||
-                            (archives && fsFree() < LogFsReserveBytes));
-       i++) {
-    if (!archiveName(files[i].name, nullptr))
+    b.logBytes += blocks(files[i].size);
+  uint64_t nonLog = b.used > b.logBytes ? b.used - b.logBytes : 0;
+  b.budget = logArchiveBudget(b.total, nonLog, LogFsReserveBytes);
+  return b;
+}
+int pruneUnlocked() {
+  Listing list;
+  if (!list.items)
+    return 0;
+  list.n = listUnlocked(list.items, ListMax);
+  struct Work {
+    LogArchiveEntry entries[ListMax];
+    int map[ListMax];
+    bool remove[ListMax];
+  };
+  auto w = (Work *)heap_caps_malloc(sizeof(Work), MALLOC_CAP_SPIRAM);
+  if (!w)
+    return 0;
+  auto entries = w->entries;
+  auto map = w->map;
+  auto remove = w->remove;
+  int n = 0;
+  for (int i = 0; i < list.n; i++) {
+    uint32_t seq;
+    if (!logArchiveSeq(list.items[i].name, &seq))
       continue;
-    char path[48];
-    snprintf(path, sizeof path, "%s/%s", Dir, files[i].name);
-    LittleFS.remove(path);
-    archives--;
-    bytes -= files[i].size;
+    entries[n] = {seq, blocks(list.items[i].size), archiveEnd(list.items[i])};
+    map[n++] = i;
   }
+  Budget b = budgetFor(list.items, list.n);
+  LogPruneLimits limits{nowUnix(), retention.load(), LogArchiveMaxFiles, b.budget, int64_t(fsFree()),
+                        LogFsReserveBytes};
+  int count = planLogPrune(entries, n, limits, remove);
+  for (int i = 0; i < n; i++)
+    if (remove[i]) {
+      char path[48];
+      snprintf(path, sizeof path, "%s/%s", Dir, list.items[map[i]].name);
+      LittleFS.remove(path);
+    }
+  free(w);
+  pruned += count;
+  return count;
 }
 // ---- tar.gz writer (bounded RAM, compressor state in PSRAM) ----
 struct GzOut {
@@ -197,10 +243,7 @@ bool compress(const char *source, uint32_t seq, File &dest) {
   free(d);
   return ok;
 }
-std::atomic<bool> rotateRequested{false};
 void rotate() {
-  if (hostActive)
-    return;
   bool forced = rotateRequested.exchange(false);
   File cur = LittleFS.open(Current, "r");
   if (!cur)
@@ -209,7 +252,7 @@ void rotate() {
   cur.close();
   if (size < (forced ? 1u : LogRotateBytes))
     return;
-  enforceRetention();
+  pruneUnlocked();
   if (fsFree() < LogFsReserveBytes + size) {
     lastError = "space";
     return;
@@ -241,7 +284,7 @@ void rotate() {
     if (size > 2 * LogRotateBytes)
       LittleFS.remove(Current);
   }
-  enforceRetention();
+  pruneUnlocked();
 }
 void flush(char *batch) {
   if (!pendingLogBytes(LogReader::File))
@@ -252,7 +295,7 @@ void flush(char *batch) {
     if (!n)
       break;
     if (fsFree() < LogFsReserveBytes) {
-      enforceRetention();
+      pruneUnlocked();
       if (fsFree() < LogFsReserveBytes) {
         discarded++;
         continue; // Never fill the shared filesystem with logs.
@@ -271,11 +314,11 @@ void flush(char *batch) {
   }
 }
 void clearFiles() {
-  LogFileInfo files[LogArchiveLimit + 8];
-  int n = listUnlocked(files, LogArchiveLimit + 8);
-  for (int i = 0; i < n; i++) {
+  Listing list;
+  list.n = listUnlocked(list.items, ListMax);
+  for (int i = 0; i < list.n; i++) {
     char path[48];
-    snprintf(path, sizeof path, "%s/%s", Dir, files[i].name);
+    snprintf(path, sizeof path, "%s/%s", Dir, list.items[i].name);
     LittleFS.remove(path);
   }
   LittleFS.remove(Temp);
@@ -287,15 +330,190 @@ void writerTask(void *) {
     return;
   }
   for (;;) {
-    // Disabled: no periodic wakeup and no flash writes until re-enabled.
+    {
+      Lock g;
+      if (clearRequested.exchange(false))
+        clearFiles();
+      flush(batch);
+      rotate();
+      uint32_t now = nowUnix();
+      // Boot / setting change: prune now. Daily age prune only while enabled.
+      bool daily = loggingEnabled() && now && (!lastAgePrune || now - lastAgePrune >= DaySeconds);
+      if (pruneRequested.exchange(false) || daily) {
+        pruneUnlocked();
+        if (now)
+          lastAgePrune = now;
+      }
+    }
+    // Disabled: no periodic wakeup and no flash writes until notified.
     uint32_t wait = loggingEnabled() ? pdMS_TO_TICKS(FlushMs) : portMAX_DELAY;
     ulTaskNotifyTake(pdTRUE, wait);
-    Lock g;
-    if (clearRequested.exchange(false))
-      clearFiles();
-    flush(batch);
-    rotate();
   }
+}
+void addBase64(cJSON *out, const uint8_t *data, size_t n) {
+  size_t encoded = 0;
+  std::vector<unsigned char> text(4 * ((n + 2) / 3) + 1);
+  mbedtls_base64_encode(text.data(), text.size(), &encoded, data, n);
+  text[encoded] = 0;
+  cJSON_AddStringToObject(out, "data", (const char *)text.data());
+}
+cJSON *reply(bool ok, const char *message = "") {
+  auto out = cJSON_CreateObject();
+  cJSON_AddBoolToObject(out, "inkos", true);
+  cJSON_AddBoolToObject(out, "ok", ok);
+  if (*message)
+    cJSON_AddStringToObject(out, "message", message);
+  return out;
+}
+struct Usage {
+  uint32_t bytes = 0, files = 0;
+  void add(uint32_t b) { bytes += b, files++; }
+};
+void walk(File &dir, Usage &u, int depth) {
+  for (File f = dir.openNextFile(); f; f = dir.openNextFile()) {
+    if (f.isDirectory()) {
+      if (depth < 3)
+        walk(f, u, depth + 1);
+    } else
+      u.add(f.size());
+    f.close();
+  }
+}
+void addUsage(cJSON *parent, const char *key, const Usage &u) {
+  auto o = cJSON_AddObjectToObject(parent, key);
+  cJSON_AddNumberToObject(o, "bytes", u.bytes);
+  cJSON_AddNumberToObject(o, "files", u.files);
+}
+cJSON *fsInfo() {
+  auto out = reply(true);
+  Usage logs, calendars, energy, other, root;
+  auto dirs = cJSON_CreateArray();
+  uint64_t total = 0, used = 0;
+  Listing list;
+  {
+    Lock g;
+    total = LittleFS.totalBytes();
+    used = LittleFS.usedBytes();
+    File top = LittleFS.open("/");
+    for (File f = top ? top.openNextFile() : File(); f; f = top.openNextFile()) {
+      const char *name = f.name();
+      if (f.isDirectory()) {
+        Usage u;
+        walk(f, u, 1);
+        auto d = cJSON_CreateObject();
+        char path[40];
+        snprintf(path, sizeof path, "/%s", name);
+        cJSON_AddStringToObject(d, "path", path);
+        cJSON_AddNumberToObject(d, "bytes", u.bytes);
+        cJSON_AddNumberToObject(d, "files", u.files);
+        cJSON_AddItemToArray(dirs, d);
+        Usage &cat = !strcmp(name, "logs") ? logs : other;
+        cat.bytes += u.bytes;
+        cat.files += u.files;
+      } else {
+        uint32_t size = f.size();
+        root.add(size);
+        if (!strncmp(name, "feed", 4) || !strncmp(name, "agenda", 6))
+          calendars.add(size);
+        else if (!strncmp(name, "energy", 6))
+          energy.add(size);
+        else
+          other.add(size);
+      }
+      f.close();
+    }
+    if (list.items)
+      list.n = listUnlocked(list.items, ListMax);
+  }
+  auto rootDir = cJSON_CreateObject();
+  cJSON_AddStringToObject(rootDir, "path", "/");
+  cJSON_AddNumberToObject(rootDir, "bytes", root.bytes);
+  cJSON_AddNumberToObject(rootDir, "files", root.files);
+  cJSON_InsertItemInArray(dirs, 0, rootDir);
+  auto fs = cJSON_AddObjectToObject(out, "littlefs");
+  cJSON_AddNumberToObject(fs, "total_bytes", total);
+  cJSON_AddNumberToObject(fs, "used_bytes", used);
+  cJSON_AddNumberToObject(fs, "free_bytes", total > used ? total - used : 0);
+  cJSON_AddNumberToObject(fs, "block_bytes", BlockBytes);
+  cJSON_AddNumberToObject(fs, "reserve_bytes", LogFsReserveBytes);
+  cJSON_AddStringToObject(fs, "device", "external SPI flash 4 MiB (extstore)");
+  auto cats = cJSON_AddObjectToObject(out, "categories");
+  addUsage(cats, "logs", logs);
+  addUsage(cats, "calendars", calendars);
+  addUsage(cats, "energy", energy);
+  addUsage(cats, "other", other);
+  cJSON_AddItemToObject(out, "dirs", dirs);
+  Budget b = budgetFor(list.items, list.n);
+  uint32_t current = 0, archives = 0, count = 0, oldest = 0, newest = 0;
+  for (int i = 0; i < list.n; i++) {
+    if (!logArchiveSeq(list.items[i].name, nullptr)) {
+      current += list.items[i].size;
+      continue;
+    }
+    archives += list.items[i].size;
+    count++;
+    uint32_t t = list.items[i].mtime >= ClockValidAfter ? list.items[i].mtime : 0;
+    if (t && (!oldest || t < oldest))
+      oldest = t;
+    if (t > newest)
+      newest = t;
+  }
+  auto lg = cJSON_AddObjectToObject(out, "log");
+  cJSON_AddNumberToObject(lg, "current_bytes", current);
+  cJSON_AddNumberToObject(lg, "archive_bytes", archives);
+  cJSON_AddNumberToObject(lg, "archive_count", count);
+  cJSON_AddNumberToObject(lg, "oldest_archive_time", oldest);
+  cJSON_AddNumberToObject(lg, "newest_archive_time", newest);
+  cJSON_AddNumberToObject(lg, "archive_budget_bytes", b.budget);
+  cJSON_AddNumberToObject(lg, "archive_max_files", LogArchiveMaxFiles);
+  cJSON_AddNumberToObject(lg, "budget_percent", LogBudgetPercent);
+  cJSON_AddNumberToObject(lg, "rotate_bytes", LogRotateBytes);
+  cJSON_AddNumberToObject(lg, "retention_days", retention.load());
+  cJSON_AddBoolToObject(lg, "clock_valid", nowUnix() != 0);
+  cJSON_AddNumberToObject(lg, "pruned", pruned.load());
+  auto fonts = cJSON_AddObjectToObject(out, "fonts");
+  auto p = esp_partition_find_first(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, "fonts");
+  cJSON_AddStringToObject(fonts, "device", "internal flash partition 'fonts' (not LittleFS)");
+  cJSON_AddNumberToObject(fonts, "partition_bytes", p ? p->size : 0);
+  cJSON_AddNumberToObject(fonts, "used_bytes", FONT_ARCHIVE_BYTES);
+  return out;
+}
+cJSON *deleteLogs(cJSON *j) {
+  auto one = cJSON_GetObjectItem(j, "name"), many = cJSON_GetObjectItem(j, "names");
+  std::vector<const char *> requested;
+  if (cJSON_IsString(one))
+    requested.push_back(one->valuestring);
+  if (cJSON_IsArray(many)) {
+    cJSON *it;
+    cJSON_ArrayForEach(it, many) {
+      if (!cJSON_IsString(it))
+        return reply(false, "names must be strings");
+      requested.push_back(it->valuestring);
+    }
+  }
+  if (requested.empty() || requested.size() > DeleteMax)
+    return reply(false, "Give name or names (1-64 log files)");
+  // Validate everything before deleting anything.
+  std::vector<std::array<char, 32>> names(requested.size());
+  for (size_t i = 0; i < requested.size(); i++)
+    if (!normalizeLogName(requested[i], names[i].data(), names[i].size()))
+      return reply(false, "Only /logs/current.log and /logs/inkos-NNNNNN.tar.gz can be deleted");
+  auto out = reply(true);
+  auto deleted = cJSON_AddArrayToObject(out, "deleted"), missing = cJSON_AddArrayToObject(out, "missing");
+  {
+    Lock g; // Writer is idle while we hold this: current.log can be removed safely;
+            // the next flush re-creates it with the lines still pending in RAM.
+    for (auto &name : names) {
+      char path[48];
+      snprintf(path, sizeof path, "%s/%s", Dir, name.data());
+      bool existed = LittleFS.exists(path);
+      if (existed && LittleFS.remove(path))
+        cJSON_AddItemToArray(deleted, cJSON_CreateString(name.data()));
+      else
+        cJSON_AddItemToArray(missing, cJSON_CreateString(name.data()));
+    }
+  }
+  return out;
 }
 } // namespace
 void startLogStore() {
@@ -305,16 +523,17 @@ void startLogStore() {
   if (!LittleFS.exists(Dir))
     LittleFS.mkdir(Dir);
   LittleFS.remove(Temp);
-  LogFileInfo files[LogArchiveLimit + 8];
-  int n = listUnlocked(files, LogArchiveLimit + 8);
-  for (int i = 0; i < n; i++) {
+  Listing list;
+  list.n = listUnlocked(list.items, ListMax);
+  for (int i = 0; i < list.n; i++) {
     uint32_t seq;
-    if (archiveName(files[i].name, &seq))
+    if (logArchiveSeq(list.items[i].name, &seq))
       nextSeq = std::max(nextSeq, seq + 1);
   }
   setLogFileNotify(notifyWriter);
   ready = true;
-  xTaskCreatePinnedToCore(writerTask, "log-store", 8192, nullptr, 1, &writer, 0);
+  pruneRequested = true; // Boot prune (size caps; age too if the clock is already valid).
+  xTaskCreatePinnedToCore(writerTask, "log-store", 12288, nullptr, 1, &writer, 0);
 }
 void applyLoggingEnabled(bool on) {
   if (!on && loggingEnabled())
@@ -322,49 +541,23 @@ void applyLoggingEnabled(bool on) {
   setLoggingEnabled(on);
   if (on)
     logf("INKOS logging enabled\n");
+  pruneRequested = true;
   notifyWriter(); // Flushes pending lines; blocks indefinitely when disabled.
 }
-int listLogFiles(LogFileInfo *out, int max) {
-  if (!ready)
-    return 0;
-  Lock g;
-  return listUnlocked(out, max);
+void setLogRetentionDays(uint16_t days) {
+  if (!validRetentionDays(days))
+    return;
+  uint16_t was = retention.exchange(days);
+  if (was != days && ready) {
+    logf("INKOS log retention days=%u\n", unsigned(days));
+    pruneRequested = true;
+    notifyWriter();
+  }
 }
-bool readLogFile(const char *name, uint32_t offset, uint8_t *out, size_t n) {
-  if (!ready || !validName(name))
-    return false;
-  char path[48];
-  snprintf(path, sizeof path, "%s/%s", Dir, name);
-  File f = LittleFS.open(path, "r");
-  if (!f || offset > f.size() || !f.seek(offset))
-    return false;
-  size_t got = f.read(out, n);
-  f.close();
-  if (got < n)
-    memset(out + got, 0, n - got);
-  return true;
-}
-void setLogHostActive(bool active) {
-  hostActive = active;
-  if (!active)
-    notifyWriter(); // Catch up on rotation/retention deferred while mounted.
-}
-static cJSON *reply(bool ok, const char *message = "") {
-  auto out = cJSON_CreateObject();
-  cJSON_AddBoolToObject(out, "inkos", true);
-  cJSON_AddBoolToObject(out, "ok", ok);
-  if (*message)
-    cJSON_AddStringToObject(out, "message", message);
-  return out;
-}
-static void addBase64(cJSON *out, const uint8_t *data, size_t n) {
-  size_t encoded = 0;
-  std::vector<unsigned char> text(4 * ((n + 2) / 3) + 1);
-  mbedtls_base64_encode(text.data(), text.size(), &encoded, data, n);
-  text[encoded] = 0;
-  cJSON_AddStringToObject(out, "data", (const char *)text.data());
-}
+uint16_t logRetentionDays() { return retention.load(); }
 cJSON *logCommand(const char *cmd, cJSON *j) {
+  if (!strcmp(cmd, "fs_info"))
+    return ready ? fsInfo() : reply(false, "Log storage unavailable");
   if (strncmp(cmd, "log_", 4))
     return nullptr;
   if (!strcmp(cmd, "log_list")) {
@@ -378,19 +571,23 @@ cJSON *logCommand(const char *cmd, cJSON *j) {
     cJSON_AddNumberToObject(out, "discarded_batches", discarded.load());
     cJSON_AddNumberToObject(out, "rotations", rotations.load());
     cJSON_AddNumberToObject(out, "rotate_bytes", LogRotateBytes);
-    cJSON_AddBoolToObject(out, "host_active", hostActive.load());
+    cJSON_AddNumberToObject(out, "retention_days", retention.load());
+    cJSON_AddNumberToObject(out, "pruned", pruned.load());
     cJSON_AddStringToObject(out, "rotate_error", lastError.load());
     auto files = cJSON_AddArrayToObject(out, "files");
-    LogFileInfo list[LogArchiveLimit + 8];
-    int n = listLogFiles(list, LogArchiveLimit + 8);
-    for (int i = 0; i < n; i++) {
-      auto f = cJSON_CreateObject();
-      cJSON_AddStringToObject(f, "name", list[i].name);
-      cJSON_AddNumberToObject(f, "size", list[i].size);
-      cJSON_AddNumberToObject(f, "mtime", list[i].mtime);
-      cJSON_AddItemToArray(files, f);
-    }
     if (ready) {
+      Listing list;
+      {
+        Lock g;
+        list.n = listUnlocked(list.items, ListMax);
+      }
+      for (int i = 0; i < list.n; i++) {
+        auto f = cJSON_CreateObject();
+        cJSON_AddStringToObject(f, "name", list.items[i].name);
+        cJSON_AddNumberToObject(f, "size", list.items[i].size);
+        cJSON_AddNumberToObject(f, "mtime", list.items[i].mtime);
+        cJSON_AddItemToArray(files, f);
+      }
       cJSON_AddNumberToObject(out, "fs_free_bytes", fsFree());
     }
     return out;
@@ -398,8 +595,9 @@ cJSON *logCommand(const char *cmd, cJSON *j) {
   if (!strcmp(cmd, "log_read")) {
     auto name = cJSON_GetObjectItem(j, "name"), offset = cJSON_GetObjectItem(j, "offset"),
          length = cJSON_GetObjectItem(j, "length");
-    if (!cJSON_IsString(name) || !validName(name->valuestring) || !cJSON_IsNumber(offset) ||
-        offset->valuedouble < 0)
+    char bare[32];
+    if (!cJSON_IsString(name) || !normalizeLogName(name->valuestring, bare, sizeof bare) ||
+        !cJSON_IsNumber(offset) || offset->valuedouble < 0)
       return reply(false, "Invalid log name or offset");
     size_t want = cJSON_IsNumber(length) && length->valueint > 0
                       ? std::min<size_t>(length->valueint, ReadChunkMax)
@@ -407,7 +605,7 @@ cJSON *logCommand(const char *cmd, cJSON *j) {
     if (!ready)
       return reply(false, "Log storage unavailable");
     char path[48];
-    snprintf(path, sizeof path, "%s/%s", Dir, name->valuestring);
+    snprintf(path, sizeof path, "%s/%s", Dir, bare);
     std::vector<uint8_t> data(want);
     size_t got = 0, size = 0;
     {
@@ -422,7 +620,7 @@ cJSON *logCommand(const char *cmd, cJSON *j) {
       f.close();
     }
     auto out = reply(true);
-    cJSON_AddStringToObject(out, "name", name->valuestring);
+    cJSON_AddStringToObject(out, "name", bare);
     cJSON_AddNumberToObject(out, "offset", offset->valuedouble);
     cJSON_AddNumberToObject(out, "length", got);
     cJSON_AddNumberToObject(out, "size", size);
@@ -446,18 +644,19 @@ cJSON *logCommand(const char *cmd, cJSON *j) {
   if (!strcmp(cmd, "log_rotate")) { // Flush now and archive current.log regardless of size.
     if (!ready)
       return reply(false, "Log storage unavailable");
-    if (hostActive)
-      return reply(false, "Log disk is mounted by a USB host; rotation is paused");
     rotateRequested = true;
     notifyWriter();
     return reply(true);
+  }
+  if (!strcmp(cmd, "log_delete")) {
+    if (!ready)
+      return reply(false, "Log storage unavailable");
+    return deleteLogs(j);
   }
   if (!strcmp(cmd, "log_clear")) {
     clearLog();
     auto files = cJSON_GetObjectItem(j, "files");
     bool removeFiles = !files || cJSON_IsTrue(files);
-    if (removeFiles && hostActive)
-      return reply(false, "Log disk is mounted by a USB host; RAM log cleared only");
     if (removeFiles && ready) {
       clearRequested = true;
       notifyWriter();

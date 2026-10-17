@@ -15,7 +15,6 @@
 #include "Zones.h"
 #include "Log.h"
 #include "LogStore.h"
-#include "UsbLogDisk.h"
 #include <Preferences.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -271,7 +270,7 @@ void displayTask(void *) {
 }
 static cJSON *deviceStatus() {
   Guard g(modelMutex); auto out = cJSON_CreateObject();
-  cJSON_AddBoolToObject(out, "inkos", true); cJSON_AddStringToObject(out, "version", "0.7.7");
+  cJSON_AddBoolToObject(out, "inkos", true); cJSON_AddStringToObject(out, "version", "0.7.8");
   cJSON_AddNumberToObject(out, "page", int(model->page)); cJSON_AddBoolToObject(out, "wifi", model->wifi);
   cJSON_AddStringToObject(out, "ip", model->ip); cJSON_AddBoolToObject(out, "spotify", model->music.authorized);
   cJSON_AddBoolToObject(out, "weather", model->weather.valid);
@@ -291,7 +290,7 @@ static cJSON *deviceStatus() {
   cJSON_AddNumberToObject(out, "log_dropped", droppedLogLines()); // Oldest lines evicted.
   cJSON_AddNumberToObject(out, "log_buffered", bufferedLogBytes());
   cJSON_AddBoolToObject(out, "logging_enabled", loggingEnabled());
-  cJSON_AddBoolToObject(out, "log_disk", usbLogDiskAvailable());
+  cJSON_AddNumberToObject(out, "log_retention_days", logRetentionDays());
   cJSON_AddNumberToObject(out, "log_file_dropped", droppedFileLogLines());
   {
     // Diagnostic copy without frameMutex: never block modelMutex holders behind
@@ -446,7 +445,7 @@ void controlTask(void *) {
     {
       Guard g(modelMutex);
       snprintf(b, sizeof b,
-               "{\"version\":\"0.7.7\",\"page\":%d,\"wifi\":%s,\"weather\":%s,\"spotify\":%s,"
+               "{\"version\":\"0.7.8\",\"page\":%d,\"wifi\":%s,\"weather\":%s,\"spotify\":%s,"
                "\"time\":%lld,\"weather_provider\":%d,\"hours\":%d,\"calendar_configured\":%s,"
                "\"calendar_events\":%d,\"calendar_stale\":%s,\"pages\":7,\"energy\":%s,\"energy_"
                "hours\":%d}",
@@ -631,7 +630,6 @@ void start() {
   loadConfiguration();
   ensureStorage();
   startLogStore();
-  startUsbLogDisk();
   loadAgenda();
   loadEnergy();
   extern bool selfTest();
@@ -646,8 +644,8 @@ void start() {
   xTaskCreatePinnedToCore(networkTask, "network", 16384, nullptr, 1, nullptr, 0);
   xTaskCreatePinnedToCore(inputTask, "input", 3072, nullptr, 3, nullptr, 1);
   xTaskCreatePinnedToCore(controlTask, "control", 12288, nullptr, 1, nullptr, 1);
-  Serial.printf("INKOS boot version=0.7.7 psram=%u bytes model=%u bytes\n", ESP.getPsramSize(),
+  Serial.printf("INKOS boot version=0.7.8 psram=%u bytes model=%u bytes\n", ESP.getPsramSize(),
                 unsigned(sizeof(Model)));
-  logf("INKOS boot version=0.7.7 reset=%d\n", int(esp_reset_reason()));
+  logf("INKOS boot version=0.7.8 reset=%d\n", int(esp_reset_reason()));
 }
 } // namespace ink

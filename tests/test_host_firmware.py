@@ -1,7 +1,7 @@
-"""Host builds of hardware-independent firmware pieces (log ring, virtual FAT disk).
+"""Host builds of hardware-independent firmware pieces (log ring, log naming/retention policy).
 
 Needs a C++17 compiler: $CXX, c++/g++/clang++ on PATH, or `python -m ziglang c++`.
-Skipped when none is available. The FAT image is also checked with pyfatfs when installed.
+Skipped when none is available.
 """
 import importlib.util
 import os
@@ -42,26 +42,10 @@ class HostFirmwareTests(unittest.TestCase):
             out = self.build_run([HOST / 'log_ring_test.cpp', SRC / 'Log.cpp'], cwd=tmp)
             self.assertIn('OK', out.stdout)
 
-    def test_virtual_fat(self):
+    def test_log_policy(self):
         with tempfile.TemporaryDirectory() as tmp:
-            self.build_run([HOST / 'virtual_fat_test.cpp', SRC / 'VirtualFat.cpp'], cwd=tmp)
-            image = Path(tmp) / 'img.bin'
-            data = image.read_bytes()
-            self.assertEqual(len(data), 8192 * 512)
-            self.assertEqual(data[510:512], b'\x55\xaa')
-            self.assertEqual(data[43:54], b'INKOS_LOGS ')
-            if importlib.util.find_spec('pyfatfs') is None:
-                return
-            from pyfatfs.PyFatFS import PyFatFS
-            disk = PyFatFS(str(image), read_only=True)
-            names = disk.listdir('/')
-            self.assertEqual(len(names), 18)
-            for i in range(1, 17):
-                expected = ''.join(chr(ord('a') + (k * 7 + i) % 26) for k in range(9000 + i * 1234))
-                self.assertEqual(disk.readbytes('/inkos-%06d.tar.gz' % i).decode(), expected)
-            current = next(name for name in names if name.lower() == 'current.log')
-            self.assertEqual(disk.readtext('/' + current), ''.join('line %d\n' % k for k in range(3000)))
-            disk.close()
+            out = self.build_run([HOST / 'log_policy_test.cpp', SRC / 'LogPolicy.cpp'], cwd=tmp)
+            self.assertIn('OK', out.stdout)
 
 if __name__ == '__main__':
     unittest.main()

@@ -54,6 +54,9 @@ void loadConfiguration() {
   config.navFastFull = n.getBool("nav_fast", true);
   config.loggingEnabled = n.getBool("log_on", true);
   setLoggingEnabled(config.loggingEnabled);
+  config.logRetentionDays = n.getUShort("log_ret", LogRetentionDefaultDays);
+  if (!validRetentionDays(config.logRetentionDays)) config.logRetentionDays = LogRetentionDefaultDays;
+  setLogRetentionDays(config.logRetentionDays);
   config.navIdleOffMs = n.getUInt("nav_idle", 3000);
   if (config.navIdleOffMs < 500 || config.navIdleOffMs > 10000) config.navIdleOffMs = 3000;
   if (n.getBytesLength("settings2") == sizeof(Settings))
@@ -174,26 +177,36 @@ static cJSON *ack(bool ok, const char *message = "") {
 }
 cJSON *configurationCommand(const char *cmd, cJSON *j) {
   if (!strcmp(cmd, "logging_set")) { // Persist + apply without a settings revision/full refresh.
-    auto on = cJSON_GetObjectItem(j, "enabled");
-    if (!cJSON_IsBool(on)) return ack(false, "enabled must be true or false");
-    bool enabled = cJSON_IsTrue(on);
+    auto on = cJSON_GetObjectItem(j, "enabled"), days = cJSON_GetObjectItem(j, "retention_days");
+    if (!on && !days) return ack(false, "Give enabled and/or retention_days");
+    if (on && !cJSON_IsBool(on)) return ack(false, "enabled must be true or false");
+    if (days && (!cJSON_IsNumber(days) || !validRetentionDays(days->valueint) || days->valuedouble != days->valueint))
+      return ack(false, "retention_days must be 7, 21, 35, 90 or 180");
+    Credentials current = credentials();
+    bool enabled = on ? cJSON_IsTrue(on) : current.loggingEnabled;
+    uint16_t retention = days ? uint16_t(days->valueint) : current.logRetentionDays;
     {
       Guard g(configMutex);
       Preferences n;
       if (!n.begin("inkos", false)) return ack(false, "Could not save logging setting");
-      bool saved = n.putBool("log_on", enabled) == 1;
+      bool saved = (!on || n.putBool("log_on", enabled) == 1) &&
+                   (!days || n.putUShort("log_ret", retention) == sizeof(uint16_t));
       n.end();
       if (!saved) return ack(false, "Could not save logging setting");
       config.loggingEnabled = enabled;
+      config.logRetentionDays = retention;
     }
-    applyLoggingEnabled(enabled);
-    auto out = ack(true, enabled ? "Logging enabled" : "Logging disabled");
-    cJSON_AddBoolToObject(out, "logging_enabled", enabled);
+    if (days) setLogRetentionDays(retention);
+    if (on) applyLoggingEnabled(enabled);
+    auto out = ack(true, "Logging settings saved");
+    cJSON_AddBoolToObject(out, "logging_enabled", loggingEnabled());
+    cJSON_AddNumberToObject(out, "log_retention_days", logRetentionDays());
     return out;
   }
   if (!strcmp(cmd, "logging_get")) {
     auto out = ack(true, "");
     cJSON_AddBoolToObject(out, "logging_enabled", loggingEnabled());
+    cJSON_AddNumberToObject(out, "log_retention_days", logRetentionDays());
     return out;
   }
   if (!strcmp(cmd, "display_tuning_get")) return displayTuning(credentials());
@@ -429,6 +442,7 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
     cJSON_AddNumberToObject(s, "page_switch_delay_ms", cfg.pageSwitchDelayMs);
     cJSON_AddNumberToObject(s, "encoder_lock_ms", cfg.encoderLockMs);
     cJSON_AddBoolToObject(s, "logging_enabled", cfg.loggingEnabled);
+    cJSON_AddNumberToObject(s, "log_retention_days", cfg.logRetentionDays);
     cJSON_AddStringToObject(s, "met_contact", v.metContact);
     auto worlds = cJSON_AddArrayToObject(s, "worlds");
     for (auto &w : v.worlds) {
@@ -453,6 +467,7 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
     Settings v = current.settings;
     uint32_t pageDelay = current.pageSwitchDelayMs, encoderLock = current.encoderLockMs;
     bool logging = current.loggingEnabled;
+    uint16_t retention = current.logRetentionDays;
     auto s = cJSON_GetObjectItem(j, "settings");
     if (!cJSON_IsObject(s)) {
       return ack(false, "Missing settings");
@@ -477,6 +492,13 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
     if (loggingField) {
       if (!cJSON_IsBool(loggingField)) return ack(false, "logging_enabled must be true or false");
       logging = cJSON_IsTrue(loggingField);
+    }
+    auto retentionField = cJSON_GetObjectItem(s, "log_retention_days");
+    if (retentionField) {
+      if (!cJSON_IsNumber(retentionField) || !validRetentionDays(retentionField->valueint) ||
+          retentionField->valuedouble != retentionField->valueint)
+        return ack(false, "log_retention_days must be 7, 21, 35, 90 or 180");
+      retention = uint16_t(retentionField->valueint);
     }
     strlcpy(v.location, stringAt(s, "location"), sizeof v.location);
     strlcpy(v.localZone, stringAt(s, "zone"), sizeof v.localZone);
@@ -535,11 +557,20 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
         n.end();
         if (!saved) return ack(false, "Could not save logging setting");
       }
+      if (retention != config.logRetentionDays) {
+        Preferences n;
+        if (!n.begin("inkos", false)) return ack(false, "Could not save log retention");
+        bool saved = n.putUShort("log_ret", retention) == sizeof(uint16_t);
+        n.end();
+        if (!saved) return ack(false, "Could not save log retention");
+        config.logRetentionDays = retention;
+      }
       config.encoderLockMs = encoderLock;
       config.settings = v;
       config.pageSwitchDelayMs = pageDelay;
       config.revision++;
     }
+    if (retention != current.logRetentionDays) setLogRetentionDays(retention);
     if (logging != current.loggingEnabled) {
       {Guard g(configMutex); config.loggingEnabled = logging;}
       applyLoggingEnabled(logging); // Takes effect now; flushes on disable.

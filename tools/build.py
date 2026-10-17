@@ -9,24 +9,14 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 FQBN = 'esp32:esp32:XIAO_ESP32S3_Plus:PSRAM=opi,CDCOnBoot=default,USBMode=hwcdc'
-# Experimental: TinyUSB CDC + read-only INKOS_LOGS mass-storage disk. Changes the USB
-# VID/PID and COM port, and esptool recovery then needs the BOOT button; see docs/LOGS.md.
-FQBN_USB_OTG = 'esp32:esp32:XIAO_ESP32S3_Plus:PSRAM=opi,CDCOnBoot=default,USBMode=default'
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cli', default=os.environ.get('ARDUINO_CLI') or shutil.which('arduino-cli'))
     parser.add_argument('--config-file', default=os.environ.get('ARDUINO_CLI_CONFIG_FILE'))
     parser.add_argument('--build-dir', type=Path, default=ROOT / '.build/firmware')
-    parser.add_argument('--output', type=Path, default=None)
-    parser.add_argument('--usb-otg', action='store_true',
-                        help='experimental TinyUSB build with the INKOS_LOGS USB disk')
+    parser.add_argument('--output', type=Path, default=ROOT / 'out/firmware')
     args = parser.parse_args()
-    suffix = '-usb-otg' if args.usb_otg else ''
-    if args.output is None:
-        args.output = ROOT / ('out/firmware' + suffix)
-    if args.usb_otg and args.build_dir == ROOT / '.build/firmware':
-        args.build_dir = ROOT / '.build/firmware-usb-otg'
     if not args.cli:
         parser.error('Install Arduino CLI or set ARDUINO_CLI to its executable.')
     archive = ROOT / 'out/assets/fonts.bin'
@@ -45,7 +35,7 @@ def main():
         mappings[str(path)] = target
     flags = ' '.join('"-ffile-prefix-map=' + source.replace('\\', '\\\\') + '=' + target + '"'
                      for source, target in mappings.items())
-    cmd = [args.cli, 'compile', '--fqbn', FQBN_USB_OTG if args.usb_otg else FQBN, '--build-property', 'upload.maximum_size=6225920',
+    cmd = [args.cli, 'compile', '--fqbn', FQBN, '--build-property', 'upload.maximum_size=6225920',
            '--build-property', 'compiler.cpp.extra_flags=' + flags,
            '--build-property', 'compiler.c.extra_flags=' + flags,
            '--build-path', str(args.build_dir.resolve()), '--output-dir', str(args.output.resolve()),

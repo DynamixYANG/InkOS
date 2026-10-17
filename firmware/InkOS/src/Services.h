@@ -28,6 +28,7 @@ struct Credentials {
   // Display tuning, separate NVS keys "nav_hold"/"nav_idle"/"nav_fast" (absent: defaults).
   bool navHoldPower = true, navFastFull = true;
   bool loggingEnabled = true; // NVS "log_on": diagnostics ring + /logs files.
+  uint16_t logRetentionDays = 35; // NVS "log_ret": 7/21/35/90/180 days.
   uint32_t navIdleOffMs = 3000;
   EnergyConfig energy;
   ICloudConfig icloud;
