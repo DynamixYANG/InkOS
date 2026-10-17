@@ -285,7 +285,8 @@ static cJSON *deviceStatus() {
   cJSON_AddNumberToObject(out, "navigation_title_us", navigationTitleUs.load());
   cJSON_AddNumberToObject(out, "navigation_accept_us", navigationAcceptUs.load());
   cJSON_AddNumberToObject(out, "render_snapshots", renderSnapshots.load());
-  cJSON_AddNumberToObject(out, "log_dropped", droppedLogLines());
+  cJSON_AddNumberToObject(out, "log_dropped", droppedLogLines()); // Oldest lines evicted.
+  cJSON_AddNumberToObject(out, "log_buffered", bufferedLogBytes());
   {
     // Diagnostic copy without frameMutex: never block modelMutex holders behind
     // a 4 s full refresh. A concurrent present() can at worst mix two samples.
@@ -338,6 +339,9 @@ String executeCommand(cJSON *j, bool usb) {
     } else if (!strcmp(action, "home")) selectPage(0);
     else if (!strcmp(action, "prev") || !strcmp(action, "next")) navigatePage(!strcmp(action, "prev") ? -1 : 1);
     else return "{\"inkos\":true,\"saved\":false,\"message\":\"Invalid navigation\"}";
+    out = cJSON_CreateObject(); cJSON_AddBoolToObject(out, "ok", true);
+  } else if (usb && !strcmp(cmd, "log_clear")) {
+    clearLog();
     out = cJSON_CreateObject(); cJSON_AddBoolToObject(out, "ok", true);
   } else if (usb && !strcmp(cmd, "icon_test")) {
     auto code = cJSON_GetObjectItem(j, "code"); Guard g(modelMutex);
@@ -587,6 +591,9 @@ void controlTask(void *) {
         }
       }
     }
+    // Same task as the replies above: drained log lines never interleave
+    // with a command reply, and this never blocks the display task.
+    drainLog();
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
@@ -594,6 +601,7 @@ void start() {
   Serial.setRxBufferSize(8192);
   Serial.setTxBufferSize(4096);
   Serial.begin(115200);
+  beginLog();
   delay(1200);
   startOtaSupervisor();
   if(!beginCjkAssets()){Serial.println("INKOS font archive verification failed; USB recovery required");return;}
