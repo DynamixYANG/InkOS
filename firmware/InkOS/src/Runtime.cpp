@@ -282,6 +282,18 @@ static cJSON *deviceStatus() {
   cJSON_AddNumberToObject(out, "navigation_title_us", navigationTitleUs.load());
   cJSON_AddNumberToObject(out, "navigation_accept_us", navigationAcceptUs.load());
   cJSON_AddNumberToObject(out, "render_snapshots", renderSnapshots.load());
+  {
+    // Diagnostic copy without frameMutex: never block modelMutex holders behind
+    // a 4 s full refresh. A concurrent present() can at worst mix two samples.
+    PanelPhases p = panel.lastPhases; uint32_t last = panel.lastDuration;
+    cJSON_AddNumberToObject(out, "display_last_ms", last);
+    auto phase = cJSON_AddObjectToObject(out, "display_phase_us");
+    cJSON_AddNumberToObject(phase, "power_on", p.powerOnUs);
+    cJSON_AddNumberToObject(phase, "transfer", p.transferUs);
+    cJSON_AddNumberToObject(phase, "waveform", p.waveformUs);
+    cJSON_AddNumberToObject(phase, "power_off", p.powerOffUs);
+    cJSON_AddNumberToObject(phase, "total", p.totalUs);
+  }
   return out;
 }
 static const char *jsonString(cJSON *j, const char *k) {
@@ -405,12 +417,16 @@ void controlTask(void *) {
   });
   server.on("/display", HTTP_GET, [&]() {
     Guard g(frameMutex);
-    char b[256];
+    char b[384];
+    auto &p = panel.lastPhases;
     snprintf(b, sizeof b,
-             "{\"frames\":%lu,\"full_frames\":%lu,\"last_ms\":%lu,\"region\":[%d,%d,%d,%d]}",
+             "{\"frames\":%lu,\"full_frames\":%lu,\"last_ms\":%lu,\"region\":[%d,%d,%d,%d],"
+             "\"phase_us\":{\"power_on\":%lu,\"transfer\":%lu,\"waveform\":%lu,\"power_off\":%lu,\"total\":%lu}}",
              (unsigned long)panel.frames, (unsigned long)panel.fullFrames,
              (unsigned long)panel.lastDuration, panel.lastRegion.x, panel.lastRegion.y,
-             panel.lastRegion.w, panel.lastRegion.h);
+             panel.lastRegion.w, panel.lastRegion.h, (unsigned long)p.powerOnUs,
+             (unsigned long)p.transferUs, (unsigned long)p.waveformUs,
+             (unsigned long)p.powerOffUs, (unsigned long)p.totalUs);
     server.send(200, "application/json", b);
   });
   server.on("/status", HTTP_GET, [&]() {

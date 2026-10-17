@@ -2,6 +2,7 @@
 #include "NavigationWaveform.h"
 #include <algorithm>
 #include <esp_heap_caps.h>
+#include <esp_timer.h>
 namespace ink {
 Panel panel;
 constexpr int CS = 44, DC = 10, RST = 38, BUSY = 4;
@@ -40,16 +41,22 @@ bool Panel::ready(uint32_t timeout) {
 bool Panel::refresh(uint32_t limit) {
   if (!powerOn())
     return false;
+  int64_t t = esp_timer_get_time();
   command(0x12);
   delay(2);
-  return ready(limit);
+  bool done = ready(limit);
+  phases.waveformUs += uint32_t(esp_timer_get_time() - t);
+  return done;
 }
 bool Panel::powerOn() {
   if (powered)
     return true;
+  int64_t t = esp_timer_get_time();
   command(0x04);
   delay(2);
-  if (!ready(15000))
+  bool done = ready(15000);
+  phases.powerOnUs += uint32_t(esp_timer_get_time() - t);
+  if (!done)
     return false;
   powered = true;
   return true;
@@ -57,9 +64,12 @@ bool Panel::powerOn() {
 bool Panel::powerOff() {
   if (!powered)
     return true;
+  int64_t t = esp_timer_get_time();
   command(0x02);
   delay(2);
-  if (!ready(15000))
+  bool done = ready(15000);
+  phases.powerOffUs += uint32_t(esp_timer_get_time() - t);
+  if (!done)
     return false;
   powered = false;
   return true;
@@ -180,6 +190,8 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode) {
   // fall back to OTP rather than applying the short waveform to body content.
   bool fastTitle = navigation && !full && navigationWindowAllowed(minx,maxx,miny,maxy);
   uint32_t start = millis();
+  int64_t startUs = esp_timer_get_time();
+  phases = {};
   if (full) {
     fullMode();
     if (!frames) {
@@ -243,15 +255,22 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode) {
     return false;
   memcpy(oldFrame, next, FRAME_BYTES);
   lastDuration = millis() - start;
+  phases.totalUs = uint32_t(esp_timer_get_time() - startUs);
+  phases.transferUs = phases.totalUs - phases.powerOnUs - phases.waveformUs - phases.powerOffUs;
+  lastPhases = phases;
   frames++;
-  Serial.printf("INKOS display mode=%s kind=%s ms=%lu partials=%lu x=%d y=%d w=%d h=%d wave=%s\n",
+  Serial.printf("INKOS display mode=%s kind=%s ms=%lu partials=%lu x=%d y=%d w=%d h=%d wave=%s "
+                "on_us=%lu xfer_us=%lu wave_us=%lu off_us=%lu total_us=%lu\n",
                 full ? "full" : "partial",
                 animation                    ? "animation"
                 : navigation                 ? "navigation"
                 : mode == RefreshMode::Music ? "music"
                                              : "clock",
                 (unsigned long)lastDuration, (unsigned long)partials, lastRegion.x, lastRegion.y,
-                lastRegion.w, lastRegion.h, fastTitle ? "nav500" : "otp");
+                lastRegion.w, lastRegion.h, fastTitle ? "nav500" : "otp",
+                (unsigned long)phases.powerOnUs, (unsigned long)phases.transferUs,
+                (unsigned long)phases.waveformUs, (unsigned long)phases.powerOffUs,
+                (unsigned long)phases.totalUs);
   return true;
 }
 } // namespace ink

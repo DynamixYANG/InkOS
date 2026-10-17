@@ -3,6 +3,10 @@
 #include <SPI.h>
 namespace ink {
 enum class RefreshMode { Clock, Music, Animation, Navigation };
+// Per-present phase timing in microseconds. transfer = mode/LUT setup + SPI data.
+struct PanelPhases {
+  uint32_t powerOnUs = 0, transferUs = 0, waveformUs = 0, powerOffUs = 0, totalUs = 0;
+};
 class Panel {
   SPIClass spi{HSPI};
   bool ok = false, powered = false;
@@ -10,6 +14,7 @@ class Panel {
   uint8_t *window = nullptr;
   uint32_t partials = 0, lastFull = 0;
   uint32_t textPartials = 0, animationPartials = 0;
+  PanelPhases phases; // Accumulated during the current present().
   void command(uint8_t);
   void data(const uint8_t *, size_t);
   void reg(uint8_t, uint8_t);
@@ -28,6 +33,7 @@ public:
   bool present(const uint8_t *, bool forceFull, RefreshMode);
   uint32_t lastDuration = 0, frames = 0, fullFrames = 0;
   Rect lastRegion = {0, 0, 0, 0};
+  PanelPhases lastPhases;
   bool healthy() const {
     return ok;
   }
