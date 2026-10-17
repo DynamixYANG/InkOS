@@ -20,6 +20,7 @@ std::atomic<bool> hostActive{false}, clearRequested{false}, ready{false};
 std::atomic<uint32_t> discarded{0}, rotations{0}, flushes{0};
 SemaphoreHandle_t fsLock = nullptr; // Serialises writer vs. clear/list/read.
 uint32_t nextSeq = 1;
+std::atomic<const char *> lastError{""}; // Last rotation failure stage, for log_list.
 struct Lock {
   Lock() { xSemaphoreTake(fsLock, portMAX_DELAY); }
   ~Lock() { xSemaphoreGive(fsLock); }
@@ -118,18 +119,24 @@ void octal(char *field, size_t width, uint32_t value) {
 }
 bool compress(const char *source, uint32_t seq, File &dest) {
   File in = LittleFS.open(source, "r");
-  if (!in)
+  if (!in) {
+    lastError = "open source";
     return false;
+  }
   uint32_t length = in.size(), mtime = time(nullptr) > 1600000000 ? uint32_t(time(nullptr)) : 0;
   auto d = (tdefl_compressor *)heap_caps_malloc(sizeof(tdefl_compressor), MALLOC_CAP_SPIRAM);
   auto buffer = (uint8_t *)heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
   bool ok = d && buffer;
+  if (!ok)
+    lastError = "alloc";
   Deflater z{d, {&dest, true}};
   if (ok) {
     const uint8_t gzip[10] = {0x1f, 0x8b, 8, 0, uint8_t(mtime), uint8_t(mtime >> 8),
                               uint8_t(mtime >> 16), uint8_t(mtime >> 24), 0, 3};
     ok = dest.write(gzip, sizeof gzip) == sizeof gzip &&
          tdefl_init(d, putBuffer, &z.out, 128) == TDEFL_STATUS_OKAY;
+    if (!ok)
+      lastError = "init";
   }
   if (ok) {
     char header[512] = {};
@@ -151,15 +158,20 @@ bool compress(const char *source, uint32_t seq, File &dest) {
     snprintf(header + 148, 8, "%06o", sum);
     header[155] = ' ';
     ok = z.feed(header, sizeof header);
+    if (!ok)
+      lastError = "header";
   }
   uint32_t copied = 0;
   while (ok && copied < length) {
     size_t n = in.read(buffer, std::min<size_t>(4096, length - copied));
     if (!n) {
+      lastError = "read";
       ok = false;
       break;
     }
     ok = z.feed(buffer, n);
+    if (!ok)
+      lastError = "deflate";
     copied += n;
     vTaskDelay(1); // Stay polite on core 0.
   }
@@ -167,6 +179,8 @@ bool compress(const char *source, uint32_t seq, File &dest) {
     static const uint8_t zeros[512] = {};
     size_t pad = (512 - length % 512) % 512;
     ok = (!pad || z.feed(zeros, pad)) && z.feed(zeros, 512) && z.feed(zeros, 512, TDEFL_FINISH);
+    if (!ok)
+      lastError = "finish";
   }
   if (ok) {
     uint8_t trailer[8];
@@ -175,6 +189,8 @@ bool compress(const char *source, uint32_t seq, File &dest) {
       trailer[4 + i] = uint8_t(z.size >> (8 * i));
     }
     ok = dest.write(trailer, 8) == 8;
+    if (!ok)
+      lastError = "trailer";
   }
   in.close();
   free(buffer);
@@ -194,19 +210,32 @@ void rotate() {
   if (size < (forced ? 1u : LogRotateBytes))
     return;
   enforceRetention();
-  if (fsFree() < LogFsReserveBytes + size)
+  if (fsFree() < LogFsReserveBytes + size) {
+    lastError = "space";
     return;
+  }
+  uint32_t started = millis();
   File out = LittleFS.open(Temp, "w");
+  if (!out)
+    lastError = "open temp";
   bool ok = out && compress(Current, nextSeq, out);
+  uint32_t packed = out ? out.position() : 0;
   if (out)
     out.close();
   char path[48];
   snprintf(path, sizeof path, "%s/inkos-%06lu.tar.gz", Dir, (unsigned long)nextSeq);
-  if (ok && LittleFS.rename(Temp, path)) {
+  bool renamed = ok && LittleFS.rename(Temp, path);
+  if (ok && !renamed)
+    lastError = "rename";
+  if (renamed) {
     LittleFS.remove(Current);
+    lastError = "";
+    logf("INKOS log rotated %s bytes=%lu packed=%lu ms=%lu\n", path + 6, (unsigned long)size,
+         (unsigned long)packed, (unsigned long)(millis() - started));
     nextSeq++;
     rotations++;
   } else {
+    logf("INKOS log rotation failed stage=%s bytes=%lu\n", lastError.load(), (unsigned long)size);
     LittleFS.remove(Temp);
     // Never let a failing rotation grow current.log without bound.
     if (size > 2 * LogRotateBytes)
@@ -285,7 +314,7 @@ void startLogStore() {
   }
   setLogFileNotify(notifyWriter);
   ready = true;
-  xTaskCreatePinnedToCore(writerTask, "log-store", 4096, nullptr, 1, &writer, 0);
+  xTaskCreatePinnedToCore(writerTask, "log-store", 8192, nullptr, 1, &writer, 0);
 }
 void applyLoggingEnabled(bool on) {
   if (!on && loggingEnabled())
@@ -350,6 +379,7 @@ cJSON *logCommand(const char *cmd, cJSON *j) {
     cJSON_AddNumberToObject(out, "rotations", rotations.load());
     cJSON_AddNumberToObject(out, "rotate_bytes", LogRotateBytes);
     cJSON_AddBoolToObject(out, "host_active", hostActive.load());
+    cJSON_AddStringToObject(out, "rotate_error", lastError.load());
     auto files = cJSON_AddArrayToObject(out, "files");
     LogFileInfo list[LogArchiveLimit + 8];
     int n = listLogFiles(list, LogArchiveLimit + 8);

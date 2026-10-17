@@ -173,6 +173,29 @@ static cJSON *ack(bool ok, const char *message = "") {
   return j;
 }
 cJSON *configurationCommand(const char *cmd, cJSON *j) {
+  if (!strcmp(cmd, "logging_set")) { // Persist + apply without a settings revision/full refresh.
+    auto on = cJSON_GetObjectItem(j, "enabled");
+    if (!cJSON_IsBool(on)) return ack(false, "enabled must be true or false");
+    bool enabled = cJSON_IsTrue(on);
+    {
+      Guard g(configMutex);
+      Preferences n;
+      if (!n.begin("inkos", false)) return ack(false, "Could not save logging setting");
+      bool saved = n.putBool("log_on", enabled) == 1;
+      n.end();
+      if (!saved) return ack(false, "Could not save logging setting");
+      config.loggingEnabled = enabled;
+    }
+    applyLoggingEnabled(enabled);
+    auto out = ack(true, enabled ? "Logging enabled" : "Logging disabled");
+    cJSON_AddBoolToObject(out, "logging_enabled", enabled);
+    return out;
+  }
+  if (!strcmp(cmd, "logging_get")) {
+    auto out = ack(true, "");
+    cJSON_AddBoolToObject(out, "logging_enabled", loggingEnabled());
+    return out;
+  }
   if (!strcmp(cmd, "display_tuning_get")) return displayTuning(credentials());
   if (!strcmp(cmd, "display_tuning_set")) {
     Credentials next = credentials();
