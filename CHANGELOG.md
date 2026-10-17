@@ -1,3 +1,11 @@
+# Firmware 0.7.8 / Studio 0.7.4 — Log storage, deletion and retention
+
+- `fs_info`: LittleFS total/used/free, per-category (logs, calendars, energy, other) and per-directory sizes, log budget, and the internal fonts partition.
+- `log_delete` (name or names, `/logs` only, strict name validation). Deleting `current.log` is serialized with the writer.
+- `log_retention_days` (7/21/35/90/180, default 35, NVS `log_ret`): archives older than the retention are pruned at rotation, daily while logging is on, at boot and on setting change, only when the clock is valid. Size safety net: ≤300 archives, 50 % of the space beyond the 512 KiB reserve not used by other data.
+- Removed the experimental USB mass-storage code and `--usb-otg`; USB stays Hardware CDC.
+- Studio 0.7.4: storage bar and capacity estimate with a space-limit warning, retention dropdown, multi-select delete, `--logs-smoke` extended.
+
 # Firmware 0.7.7 / Studio 0.7.3 — Persistent device logs
 
 - Log ring v2: independent USB and flash readers on the 16 KiB non-blocking PSRAM ring, `log_tail`, runtime enable flag.
