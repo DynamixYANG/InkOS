@@ -1,79 +1,101 @@
+#include "CalendarLayout.h"
 #include "Canvas.h"
 #include "Zones.h"
+#include <algorithm>
 namespace ink {
-void renderWeek(Canvas &c, const Model &m, time_t now) {
-  renderChrome(c, "CALENDAR / WEEK AGENDA", Page::Week, m);
-  const char *week[] = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"};
-  auto local = inZone(now, m.settings.localZone);
-  time_t wall = Clock::epoch(local.tm_year + 1900, local.tm_mon + 1, local.tm_mday) -
-                ((local.tm_wday + 6) % 7) * 86400;
-  auto first = Clock::utc(wall), last = Clock::utc(wall + 6 * 86400);
-  char b[160];
-  snprintf(b, sizeof b, "%02d.%02d - %02d.%02d / %s", first.tm_mday, first.tm_mon + 1, last.tm_mday,
-           last.tm_mon + 1, m.settings.localZone);
-  c.fit(24, 76, 472, b, 14);
-  if (!m.agenda.configured)
-    c.text(520, 76, "Connect a calendar in Studio", 14);
-  else if (m.agenda.stale)
-    c.text(618, 76, "CACHED / RETRY", 14);
-  c.text(24, 100, "DAY", 14);
-  c.text(128, 100, "TIME", 14);
-  c.text(248, 100, "EVENT", 14);
-  c.text(584, 100, "PLACE", 14);
-  c.line(24, 108, 775, 108);
-  c.line(112, 116, 112, 432);
-  for (int d = 0; d < 7; d++) {
-    int y = 112 + d * 46;
-    auto date = Clock::utc(wall + d * 86400);
-    bool today = date.tm_yday == local.tm_yday && date.tm_year == local.tm_year;
-    if (today)
-      c.rect(24, y + 4, 72, 38);
-    c.text(32, y + 19, week[d], 14, !today);
-    snprintf(b, sizeof b, "%02d.%02d", date.tm_mday, date.tm_mon + 1);
-    c.text(32, y + 37, b, 16, !today);
-    time_t start = fromZone(wall + d * 86400, m.settings.localZone),
-           end = fromZone(wall + (d + 1) * 86400, m.settings.localZone);
-    const CalendarEvent *visible[2] = {};
-    int count = 0;
-    for (int i = 0; i < m.agenda.count; i++) {
-      const auto &e = m.agenda.events[i];
-      if (e.start >= end || e.end <= start)
-        continue;
-      if (count < 2)
-        visible[count] = &e;
-      count++;
-    }
-    if (!count)
-      c.text(248, y + 27, "No events", 16);
-    for (int j = 0; j < 2 && visible[j]; j++) {
-      const auto &e = *visible[j];
-      int baseline = y + 19 + j * 18;
-      auto a = inZone(e.start, m.settings.localZone), z = inZone(e.end, m.settings.localZone);
-      if (e.allDay)
-        strlcpy(b, "ALL DAY", sizeof b);
-      else if (e.start < start && e.end >= end)
-        strlcpy(b, "CONTINUES", sizeof b);
-      else if (e.start < start)
-        snprintf(b, sizeof b, "TO %02d:%02d", z.tm_hour, z.tm_min);
-      else if (e.end > end)
-        snprintf(b, sizeof b, "%02d:%02d +", a.tm_hour, a.tm_min);
-      else
-        snprintf(b, sizeof b, "%02d:%02d-%02d:%02d", a.tm_hour, a.tm_min, z.tm_hour, z.tm_min);
-      c.fit(128, baseline, 104, b, 14);
-      c.fit(248, baseline, 312, e.title, 16);
-      c.fit(584, baseline, 144, e.location, 14);
-    }
-    // Dedicated overflow column never paints over either event or its location.
-    if (count > 2) {
-      snprintf(b, sizeof b, "+%d", count - 2);
-      c.fit(744, y + 27, 32, b, 14);
-    }
-    if (d < 6)
-      c.line(128, y + 45, 775, y + 45);
-  }
-  if (m.agenda.truncated)
-    c.text(24, 442, "96 nearest events retained / additional events omitted", 14);
-  else if (m.agenda.error[0])
-    c.fit(24, 442, 752, m.agenda.error, 14);
+static void label(Canvas &c, int x, int y, int width, const char *text, bool black = true) {
+  c.fit(x, y, width, text, 14, black);
 }
-} // namespace ink
+static int titleRows(Canvas &c, int x, int baseline, int width, int bottom, const char *text) {
+  int rows = std::max(0, (bottom - 3 - baseline) / 14 + 1);
+  return baseline + 14 * c.wrapped(x, baseline, width, text, 14, rows, 14);
+}
+static void eventBlock(Canvas &c, const CalendarEvent &e, const weekgrid::TimedBlock &b,
+                       int day, time_t now, bool today) {
+  using namespace weekgrid;
+  if (b.lane >= MaxLanes) return;
+  int x0 = columnX(day), dayWidth = columnX(day + 1) - x0;
+  int x = x0 + 3 + (dayWidth - 4) * b.lane / b.lanes;
+  int right = x0 + 3 + (dayWidth - 4) * (b.lane + 1) / b.lanes - 2;
+  int w = right - x, h = b.bottom - b.top;
+  bool active = today && e.start <= now && now < e.end;
+  c.rect(x, b.top, w, h, false); c.box(x, b.top, w, h);
+  c.rect(x, b.top, active ? 3 : 2, h);
+  int y = b.top + 14;
+  if (h >= 48) {
+    char time[24];
+    if (w >= 64) snprintf(time, sizeof time, "%02d:%02d", b.start / 60, b.start % 60);
+    else snprintf(time, sizeof time, "%02dh", b.start / 60);
+    if (active) c.rect(x + 1, b.top + 1, w - 2, 17);
+    label(c, x + 5, y, w - 9, time, !active);
+    y += 14;
+  }
+  y = titleRows(c, x + 5, y, w - 9, b.bottom, e.title);
+  if (y < b.bottom - 2 && e.location[0]) label(c, x + 5, y, w - 9, e.location);
+}
+void renderWeek(Canvas &c, const Model &m, time_t now) {
+  using namespace weekgrid;
+  auto local = inZone(now, m.settings.localZone);
+  char b[160];
+  strlcpy(b, "CALENDAR / NEXT 7 DAYS", sizeof b);
+  renderChrome(c, b, Page::Week, m);
+  if (!Clock::valid()) { c.text(24, 100, "Waiting for network time", 18); return; }
+  time_t wall = agendaFirstDay(now, m.settings.localZone);
+  auto first = Clock::utc(wall), last = Clock::utc(wall + 6 * 86400);
+  snprintf(b, sizeof b, "%02d.%02d.%04d - %02d.%02d.%04d / %s", first.tm_mday, first.tm_mon + 1,
+           first.tm_year + 1900, last.tm_mday, last.tm_mon + 1, last.tm_year + 1900, m.settings.localZone);
+  c.fit(12, 70, 588, b, 14);
+  if (!m.agenda.configured) c.fit(616, 70, 160, "NOT CONNECTED", 14);
+  else if (m.agenda.stale) c.text(648, 70, "CACHED", 14);
+  const char *days[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+  const auto range = visibleRange(m.agenda, wall, m.settings.localZone, now);
+  AllDayPlan allDay; planAllDay(m.agenda, wall, m.settings.localZone, allDay);
+  c.text(12, AllDayTop + 14, "ALL", 14);
+  c.line(12, 84, Right, 84); c.line(12, 126, Right, 126);
+  c.line(12, Top - 5, Right, Top - 5);
+  for (int d = 0; d <= 7; d++) c.line(columnX(d), 84, columnX(d), Bottom);
+  int hours = (range.last - range.first) / 60, tick = hours > 16 ? 2 : 1;
+  auto hourTick = [&](int minute) {
+    int y = minuteY(minute, range);
+    snprintf(b, sizeof b, "%02d:00", minute / 60);
+    c.text(12, y + 5, b, 14); c.dottedLine(Left, y, Right - Left);
+  };
+  for (int minute = range.first; minute <= range.last; minute += tick * 60) hourTick(minute);
+  if ((range.last - range.first) % (tick * 60)) hourTick(range.last);
+  c.line(Left, Bottom, Right, Bottom);
+  int hiddenTotal = 0;
+  for (int d = 0; d < 7; d++) {
+    auto date = Clock::utc(wall + d * 86400); bool today = d == 0;
+    int x = columnX(d), width = columnX(d + 1) - x;
+    if (today) c.rect(x + 1, 85, width - 1, 40);
+    c.text(x + 8, 101, days[date.tm_wday], 14, !today);
+    snprintf(b, sizeof b, "%02d.%02d", date.tm_mday, date.tm_mon + 1);
+    c.text(x + 8, 119, b, 16, !today);
+    DayPlan plan; planDay(m.agenda, wall + d * 86400, m.settings.localZone, range, plan);
+    int overflow = plan.hidden + allDay.hidden[d];
+    hiddenTotal += overflow;
+    if (overflow) {
+      snprintf(b, sizeof b, "+%d", overflow);
+      // Header badge reports omitted blocks without covering event titles.
+      c.text(x + width - c.textWidth(b, 14) - 5, 101, b, 14, !today);
+    }
+    for (int i = 0; i < plan.count; i++) eventBlock(c, m.agenda.events[plan.blocks[i].event], plan.blocks[i], d, now, today);
+  }
+  for (int i = 0; i < allDay.count; i++) {
+    const auto &a = allDay.blocks[i]; if (a.lane >= AllDayRows) continue;
+    int x = columnX(a.first) + 3, width = columnX(a.last) - x - 3, y = AllDayTop + a.lane * AllDayRowHeight;
+    c.rect(x, y, width, 17, false); c.box(x, y, width, 17);
+    label(c, x + 4, y + 13, width - 8, m.agenda.events[a.event].title);
+  }
+  int day = 0, minute = local.tm_hour * 60 + local.tm_min;
+  if (minute >= range.first && minute <= range.last) {
+    int x = columnX(day), right = columnX(day + 1), y = minuteY(minute, range);
+    c.line(x + 1, y, right - 1, y);
+    for (int n = 0; n < 5; n++) c.line(x - 4 + n, y - 4 + n, x - 4 + n, y + 4 - n);
+  }
+  if (m.agenda.error[0]) c.fit(68, 469, Right - 68, m.agenda.error, 14);
+  else if (m.agenda.truncated) c.text(68, 469, "96 retained / +N more events", 14);
+  else if (!m.agenda.configured) c.text(68, 469, "Connect calendars in Studio", 14);
+  else if (hiddenTotal) c.text(68, 469, "+N more events", 14);
+}
+}

@@ -1,4 +1,5 @@
 #include "Panel.h"
+#include "NavigationWaveform.h"
 #include <algorithm>
 #include <esp_heap_caps.h>
 namespace ink {
@@ -95,6 +96,23 @@ void Panel::partialMode() {
     data(v, 2);
   reg(0x52, 0x0b);
 }
+void Panel::navigationMode() {
+  // Experimental title-only ~500ms total presentation. UC8179 register LUT,
+  // balanced transitions; keep panel voltages/PLL unchanged. Only the title
+  // gates are scanned, with border Hi-Z and VCOM floating at waveform end.
+  reg(0xE0, 0);
+  reg(0, 0x3f);
+  const uint8_t interval[] = {0xa9, 7};
+  command(0x50); data(interval, sizeof interval);
+  reg(0x52, 0x0b);
+  for (int lut=0;lut<6;lut++) {
+    uint8_t waveform[60] = {};
+    makeNavigationLut(lut, waveform);
+    command(0x20+lut);
+    // R20/R22/R23/R24: 10 groups; R21/R25: 7 groups. Clear unused groups too.
+    data(waveform, navigationLutBytes(lut));
+  }
+}
 bool Panel::begin() {
   oldFrame = (uint8_t *)heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
   window = (uint8_t *)heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
@@ -152,8 +170,15 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode) {
   if (maxx < 0 && !force)
     return true;
   bool animation = mode == RefreshMode::Animation;
-  bool full = force || !lastFull || textPartials >= (mode == RefreshMode::Music ? 32u : 60u) ||
-              animationPartials >= 1200 || (millis() - lastFull > 1800000u);
+  // A navigation preview must never turn into a maintenance full refresh.
+  // The settled page immediately follows with a full refresh and resets the budget.
+  bool navigation = mode == RefreshMode::Navigation;
+  bool full = force || !lastFull || (!navigation &&
+              (textPartials >= (mode == RefreshMode::Music ? 32u : 60u) ||
+               animationPartials >= 1200 || (millis() - lastFull > 1800000u)));
+  // A future renderer accidentally changing pixels outside the header must
+  // fall back to OTP rather than applying the short waveform to body content.
+  bool fastTitle = navigation && !full && navigationWindowAllowed(minx,maxx,miny,maxy);
   uint32_t start = millis();
   if (full) {
     fullMode();
@@ -183,7 +208,12 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode) {
     int x0 = std::max(0, minx - 1) * 8, x1 = std::min(99, maxx + 1) * 8 + 7,
         y0 = std::max(0, miny - 2), y1 = std::min(479, maxy + 2);
     int stride = (x1 - x0 + 1) / 8, h = y1 - y0 + 1;
-    partialMode();
+    if (fastTitle) {
+      x0=std::max(x0,NavigationLeft); x1=std::min(x1,NavigationRight);
+      y0=std::max(y0,NavigationTop); y1=std::min(y1,NavigationBottom);
+      stride=(x1-x0+1)/8; h=y1-y0+1;
+      navigationMode();
+    } else partialMode(); // Explicitly restores OTP after any short preview.
     lastRegion = {x0, y0, x1 - x0 + 1, y1 - y0 + 1};
     uint8_t region[] = {uint8_t(x0 >> 8), uint8_t(x0),      uint8_t(x1 >> 8),
                         uint8_t(x1),      uint8_t(y0 >> 8), uint8_t(y0),
@@ -214,13 +244,14 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode) {
   memcpy(oldFrame, next, FRAME_BYTES);
   lastDuration = millis() - start;
   frames++;
-  Serial.printf("INKOS display mode=%s kind=%s ms=%lu partials=%lu x=%d y=%d w=%d h=%d\n",
+  Serial.printf("INKOS display mode=%s kind=%s ms=%lu partials=%lu x=%d y=%d w=%d h=%d wave=%s\n",
                 full ? "full" : "partial",
                 animation                    ? "animation"
+                : navigation                 ? "navigation"
                 : mode == RefreshMode::Music ? "music"
                                              : "clock",
                 (unsigned long)lastDuration, (unsigned long)partials, lastRegion.x, lastRegion.y,
-                lastRegion.w, lastRegion.h);
+                lastRegion.w, lastRegion.h, fastTitle ? "nav500" : "otp");
   return true;
 }
 } // namespace ink

@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "rendered_pages": 6,
+  "masked_url_twoway": true,
+  "network_inputs_twoway": true,
+  "page_delay_twoway": true,
+  "ip_minimum_size": true,
+  "energy_input_tax_and_source_bindings": true,
+  "sidebar_click": true,
+  "minimum_size": [
+    1040,
+    720
+  ],
+  "button_font": "IBM Plex Mono",
+  "library": "ShadUI 0.2.4 (pinned NuGet package)",
+  "interactive_window_opened": false,
+  "rendering": "Avalonia Headless \u002B Skia; real application visual tree"
+}

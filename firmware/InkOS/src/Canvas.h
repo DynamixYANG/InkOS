@@ -13,6 +13,7 @@ struct Font {
   uint8_t advance, size;
 };
 const Font &font(int size);
+enum class WeatherMetric { Temperature=13, Rain=14, Wind=15 };
 class Canvas {
 public:
   uint8_t *pixels;
@@ -25,14 +26,19 @@ public:
   void circle(int x, int y, int r, int stroke = 1);
   void text(int x, int baseline, const char *text, int size = 16, bool black = true);
   int textWidth(const char *, int size = 16);
-  void fit(int x, int baseline, int width, const char *, int size = 20);
+  void fit(int x, int baseline, int width, const char *, int size = 20, bool black = true);
+  int prefixBytes(const char *, int width, int size, bool wordWrap = false);
+  int wrapped(int x, int baseline, int width, const char *, int size, int maxLines, int lineHeight);
   void centered(int x, int baseline, int width, const char *, int size = 16);
   void icon(int x, int y, int size, int code, bool day = true);
+  void metricIcon(int x,int y,int size,WeatherMetric);
   void animatedIcon(int x, int y, int size, int code, bool day, unsigned phase);
   void image(int x, int y, int w, int h, const uint8_t *bits);
   void dottedLine(int x, int y, int w);
 };
 void renderChrome(Canvas &, const char *, Page, const Model &);
+void renderDeviceStatus(Canvas &, const Model &);
+void renderNavigationTitle(Canvas &, Page, const Settings &, time_t);
 void renderHome(Canvas &, const Model &, time_t, unsigned phase = 0);
 void renderMusic(Canvas &, const Model &, time_t, int64_t);
 void renderForecast(Canvas &, const Model &, time_t);

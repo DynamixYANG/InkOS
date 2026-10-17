@@ -1,14 +1,14 @@
 #include "ICalendar.h"
+#include "CalendarLayout.h"
+#include "CalDav.h"
 #include "Services.h"
 #include "Zones.h"
+#include "Storage.h"
 #include <LittleFS.h>
 #include <esp_heap_caps.h>
 namespace ink {
-static bool storeReady = false;
 static bool storage() {
-  if (!storeReady)
-    storeReady = LittleFS.begin(true, "/inkstore", 5, "storage");
-  return storeReady;
+  return ensureStorage();
 }
 static uint32_t key(const String &s) {
   uint32_t h = 2166136261u;
@@ -17,8 +17,14 @@ static uint32_t key(const String &s) {
   return h;
 }
 struct CacheHeader {
-  uint32_t magic, size, checksum;
+  uint32_t magic, size, checksum, source;
 };
+static uint32_t sourceKey(const Credentials &cfg) {
+  String identity=cfg.settings.localZone;
+  for(auto &f:cfg.feeds)if(f.enabled){identity+='|';identity+=f.url;}
+  if(cfg.icloud.enabled){identity+="|icloud:";identity+=cfg.icloud.username;identity+='|';identity+=cfg.icloud.calendarUrl;}
+  return key(identity);
+}
 static uint32_t bytesHash(const void *v, size_t n) {
   auto p = (const uint8_t *)v;
   uint32_t h = 2166136261u;
@@ -38,7 +44,7 @@ static bool saveBlob(const char *path, const void *p, size_t n) {
 }
 void loadAgenda() {
   auto cfg = credentials();
-  bool enabled = false;
+  bool enabled = cfg.icloud.enabled;
   for (auto &f : cfg.feeds)
     enabled |= f.enabled;
   if (!enabled || !storage())
@@ -47,7 +53,7 @@ void loadAgenda() {
   if (!file)
     return;
   CacheHeader h;
-  if (file.readBytes((char *)&h, sizeof h) != sizeof h || h.magic != 0x32414749 ||
+  if (file.readBytes((char *)&h, sizeof h) != sizeof h || h.magic != 0x33414749 || h.source != sourceKey(cfg) ||
       h.size != sizeof(Agenda))
     return;
   auto a = (Agenda *)heap_caps_malloc(sizeof(Agenda), MALLOC_CAP_SPIRAM);
@@ -120,7 +126,7 @@ void updateCalendars() {
   if (!result)
     return;
   new (result) Agenda();
-  bool any = false;
+  bool any = cfg.icloud.enabled;
   for (auto &f : cfg.feeds)
     any |= f.enabled;
   if (!any) {
@@ -140,12 +146,17 @@ void updateCalendars() {
     return;
   }
   auto local = inZone(time(nullptr), cfg.settings.localZone);
-  time_t wall = Clock::epoch(local.tm_year + 1900, local.tm_mon + 1, local.tm_mday) -
-                ((local.tm_wday + 6) % 7) * 86400;
+  time_t wall = agendaFirstDay(time(nullptr), cfg.settings.localZone);
   time_t begin = fromZone(wall, cfg.settings.localZone),
          end = fromZone(wall + 35 * 86400, cfg.settings.localZone);
   bool good = true;
+  if (cfg.icloud.enabled) {
+    int status=0;
+    good=fetchICloud(cfg.icloud,cfg.settings.localZone,begin,end,*result,status);
+    if(!good) strlcpy(result->error,status==401||status==403?"iCloud authorization failed; check app-specific password":"iCloud calendar sync failed; keeping cached events",sizeof result->error);
+  }
   for (int i = 0; i < 3; i++) {
+    if(!good)break;
     auto &feed = cfg.feeds[i];
     if (!feed.enabled || feed.url.isEmpty())
       continue;
@@ -186,7 +197,7 @@ void updateCalendars() {
       result->revision = model->agenda.revision + 1;
       model->agenda = *result;
     }
-    CacheHeader h = {0x32414749, sizeof(Agenda), bytesHash(result, sizeof(Agenda))};
+    CacheHeader h = {0x33414749, sizeof(Agenda), bytesHash(result, sizeof(Agenda)), sourceKey(cfg)};
     File f = LittleFS.open("/agenda.bin.next", "w");
     if (f) {
       bool ok = f.write((uint8_t *)&h, sizeof h) == sizeof h &&

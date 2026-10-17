@@ -98,7 +98,11 @@ struct Music {
 };
 struct Model {
   Page page = Page::Home;
+  uint32_t navigationRevision = 0, pageSwitchDelayMs = 500, encoderLockMs = 2000;
+  int64_t navigationRequestedUs = 0;
   bool wifi = false;
+  int wifiRssi = -127, batteryPercent = -1;
+  float batteryVoltage = NAN;
   char ip[24] = {0};
   Weather weather;
   Energy energy;

@@ -199,6 +199,16 @@ bool selfTest() {
                         *energy, stamp, 0) &&
       fabs(priceAt(*energy, stamp + 7200)->spotNetCt - 10) < .0001);
   free(energy);
+  extern void calendarLayoutChecks(int &, int &);
+  calendarLayoutChecks(passed, total);
+  extern void textRenderingChecks(int &, int &);
+  textRenderingChecks(passed, total);
+  extern void lyricsResolverChecks(int &, int &);
+  lyricsResolverChecks(passed, total);
+  extern void navigationChecks(int &, int &);
+  navigationChecks(passed, total);
+  extern void hardwareCalendarChecks(int &, int &);
+  hardwareCalendarChecks(passed, total);
   Serial.printf("INKOS selftest passed=%d total=%d\n", passed, total);
   return passed == total;
 }

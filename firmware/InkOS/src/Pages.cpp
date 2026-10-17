@@ -1,5 +1,6 @@
 #include "Canvas.h"
 #include "Layout.h"
+#include "CalendarLayout.h"
 #include "Zones.h"
 #include <algorithm>
 #include <esp_timer.h>
@@ -16,17 +17,23 @@ static void number(char *b, size_t n, float v, const char *suffix = "", int deci
 }
 void renderChrome(Canvas &c, const char *title, Page page, const Model &m) {
   c.clear();
-  c.text(layout::Margin, layout::HeaderBaseline, title, 20);
-  char q[64];
-  snprintf(q, sizeof q, "INKOS / 0%d", int(page) + 1);
-  c.text(650, layout::HeaderBaseline, q, 14);
+  c.fit(layout::Margin, layout::HeaderBaseline, layout::HeaderTitleWidth, title, 20);
+  renderDeviceStatus(c, m);
   c.line(layout::Margin, layout::HeaderRule, layout::Right, layout::HeaderRule);
-  c.line(layout::Margin, layout::FooterRule, layout::Right, layout::FooterRule);
-  c.text(24, 469, "KEY1 < PREV   KEY2 NEXT >   KEY3 HOME", 14);
-  const char *names[] = {"HOME", "MUSIC", "WEATHER", "WEEK", "MOON", "SUN", "ENERGY"};
-  snprintf(q, sizeof q, "0%d / 07  %s", int(page) + 1, names[int(page)]);
-  c.text(410, 469, q, 14);
-  c.text(665, 469, m.wifi ? "ONLINE" : "OFFLINE", 14);
+}
+void renderNavigationTitle(Canvas &c, Page page, const Settings &settings, time_t now) {
+  const char *titles[] = {"TIME / CALENDAR", "NOW PLAYING / SPOTIFY", "", "",
+                          "LUNAR CALENDAR", "SUNRISE / SUNSET", "ENERGY / FINLAND"};
+  char title[96];
+  if (page == Page::Forecast)
+    snprintf(title, sizeof title, "WEATHER / %s", settings.location);
+  else if (page == Page::Week)
+    snprintf(title, sizeof title, "CALENDAR / NEXT 7 DAYS");
+  else
+    strlcpy(title, titles[int(page)], sizeof title);
+  // Keep the current body, price, page number and footer untouched until commit.
+  c.rect(layout::Margin, 4, layout::HeaderTitleWidth, 31, false);
+  c.fit(layout::Margin, layout::HeaderBaseline, layout::HeaderTitleWidth, title, 20);
 }
 static void calendar(Canvas &c, int x, int y, int w, int h, const tm &date) {
   int year = date.tm_year + 1900, month = date.tm_mon + 1;
@@ -38,11 +45,24 @@ static void calendar(Canvas &c, int x, int y, int w, int h, const tm &date) {
   const char *d[] = {"M", "T", "W", "T", "F", "S", "S"};
   int offset = (Clock::utc(Clock::epoch(year, month, 1)).tm_wday + 6) % 7;
   int rows = (offset + Clock::monthDays(year, month) + 6) / 7;
-  int cw = w / 7, ch = (h - 46) / rows;
+  constexpr int rail = 32;
+  int cw = (w - rail) / 7, ch = (h - 46) / rows;
+  c.text(x + (rail - 4 - c.textWidth("WK", 18))/2, y + 39, "WK", 18);
+  time_t firstRow = Clock::epoch(year, month, 1) - offset * 86400;
+  auto current = isoWeek(date);
+  for (int row = 0; row < rows; row++) {
+    auto wk = isoWeek(Clock::utc(firstRow + row * 7 * 86400));
+    int yy = y + 47 + row * ch;
+    snprintf(b, sizeof b, "%02d", wk.number);
+    if (wk.year == current.year && wk.number == current.number)
+      c.line(x + 6, yy + 21, x + rail - 10, yy + 21);
+    int weekX = x + (rail - 4 - c.textWidth(b, 18))/2;
+    c.text(weekX, yy + 17, b, 18); c.text(weekX + 1, yy + 17, b, 18);
+  }
   for (int i = 0; i < 7; i++)
-    c.centered(x + i * cw, y + 39, cw, d[i], 14);
+    c.centered(x + rail + i * cw, y + 39, cw, d[i], 14);
   for (int day = 1; day <= Clock::monthDays(year, month); day++) {
-    int k = offset + day - 1, xx = x + (k % 7) * cw, yy = y + 47 + (k / 7) * ch;
+    int k = offset + day - 1, xx = x + rail + (k % 7) * cw, yy = y + 47 + (k / 7) * ch;
     bool pub = false, flag = false;
     for (int i = 0; i < n; i++)
       if (days[i].month == month && days[i].day == day) {
@@ -72,154 +92,96 @@ static const Holiday *nextHoliday(Holiday *list, int count, const tm &t) {
 void renderHome(Canvas &c, const Model &m, time_t now, unsigned phase) {
   renderChrome(c, "TIME / CALENDAR", Page::Home, m);
   renderCurrentPrice(c, m.energy, now);
-  tm fi = inZone(now, m.settings.localZone);
-  char b[128];
-  c.fit(24, 80, 392, m.settings.location, 16);
+  auto fi = inZone(now, m.settings.localZone);
+  char b[160];
+  c.fit(12, 66, 280, m.settings.location, 16);
   snprintf(b, sizeof b, "%02d", fi.tm_hour);
-  c.text(18, 180, Clock::valid() ? b : "--", 96);
+  c.text(6, 166, Clock::valid() ? b : "--", 96);
   int advance = font(96).advance;
   snprintf(b, sizeof b, "%02d", fi.tm_min);
-  c.text(18 + 3 * advance, 180, Clock::valid() ? b : "--", 96);
-  // Center the colon on the numeral cap height instead of the font baseline.
+  c.text(6 + 3 * advance, 166, Clock::valid() ? b : "--", 96);
   if (!m.settings.animations || !Clock::valid() || !(now & 1)) {
-    c.circle(18 + 2 * advance + advance / 2, 133, 3, 3);
-    c.circle(18 + 2 * advance + advance / 2, 157, 3, 3);
+    c.circle(6 + 2 * advance + advance / 2, 119, 3, 3);
+    c.circle(6 + 2 * advance + advance / 2, 143, 3, 3);
   }
-  snprintf(b, sizeof b, "%s  %02d.%02d.%04d", WEEK[fi.tm_wday], fi.tm_mday, fi.tm_mon + 1,
-           fi.tm_year + 1900);
-  c.text(24, 212, Clock::valid() ? b : "Waiting for network time", 18);
-  c.line(24, 224, layout::HomeLeftRight, 224);
+  snprintf(b, sizeof b, "%s  %02d.%02d.%04d", WEEK[fi.tm_wday], fi.tm_mday, fi.tm_mon + 1, fi.tm_year + 1900);
+  c.text(12, 216, Clock::valid() ? b : "Waiting for network time", 18);
   for (int i = 0; i < 2; i++) {
-    int x = 24 + i * 208;
+    int y = 90 + i * 86;
     auto local = inZone(now, m.settings.worlds[i].zone);
-    c.fit(x, 248, 184, m.settings.worlds[i].label, 16);
+    c.fit(324, y, 112, m.settings.worlds[i].label, 16);
     snprintf(b, sizeof b, "%02d:%02d", local.tm_hour, local.tm_min);
-    c.text(x, 280, Clock::valid() ? b : "--:--", 32);
-    int offset = zoneOffset(now, m.settings.worlds[i].zone) / 60;
-    snprintf(b, sizeof b, "UTC%+d:%02d / %02d.%02d", offset / 60, abs(offset) % 60, local.tm_mday,
-             local.tm_mon + 1);
-    c.text(x, 304, b, 14);
+    c.text(324, y + 34, Clock::valid() ? b : "--:--", 28);
   }
-  c.line(layout::HomeDivider, 64, layout::HomeDivider, layout::HomeBottom);
-  if (Clock::valid())
-    calendar(c, layout::HomeRight, 63, 312, 246, fi);
-  else
-    c.text(layout::HomeRight, 125, "Waiting for clock sync", 18);
-  c.line(layout::HomeRight, layout::HomeLowerRule, layout::Right, layout::HomeLowerRule);
-  const CalendarEvent *event = nextEvent(m.agenda, now);
-  c.text(layout::HomeRight, 332,
-         event && event->start <= now && !event->allDay ? "NOW"
-         : m.agenda.stale                               ? "UP NEXT / CACHED"
-                                                        : "UP NEXT",
-         14);
+  c.line(layout::HomeDivider, 54, layout::HomeDivider, layout::HomeBottom);
+  if (Clock::valid()) calendar(c, layout::HomeRight, 54, 312, 274, fi);
+  else c.text(layout::HomeRight, 125, "Waiting for clock sync", 18);
+  c.line(layout::HomeRight, 336, layout::Right, 336);
+  const auto *event = nextEvent(m.agenda, now);
+  c.text(layout::HomeRight, 356, event && event->start <= now && !event->allDay ? "NOW"
+                           : m.agenda.stale ? "UP NEXT / CACHED" : "UP NEXT", 14);
   if (event) {
     auto t = inZone(event->start, m.settings.localZone);
-    if (event->allDay)
-      snprintf(b, sizeof b, "%02d.%02d / ALL DAY", t.tm_mday, t.tm_mon + 1);
-    else
-      snprintf(b, sizeof b, "%02d.%02d  %02d:%02d", t.tm_mday, t.tm_mon + 1, t.tm_hour, t.tm_min);
-    c.text(layout::HomeRight, 356, b, 16);
-    c.fit(layout::HomeRight, 380, 312, event->title, 18);
-  } else
-    c.fit(layout::HomeRight, 356, 312,
-          m.agenda.configured ? "No upcoming events" : "Set up calendar subscriptions", 16);
-  c.line(layout::HomeRight, 392, layout::Right, 392);
-  Holiday list[48];
-  int n = holidays(fi.tm_year + 1900, list, 48);
+    if (event->allDay) snprintf(b, sizeof b, "%02d.%02d / ALL DAY", t.tm_mday, t.tm_mon + 1);
+    else snprintf(b, sizeof b, "%02d.%02d  %02d:%02d", t.tm_mday, t.tm_mon + 1, t.tm_hour, t.tm_min);
+    c.text(layout::HomeRight, 380, b, 16);
+    c.fit(layout::HomeRight, 404, 312, event->title, 18);
+  } else c.fit(layout::HomeRight, 380, 312, m.agenda.configured ? "No upcoming events" : "Set up calendars in Studio", 16);
+  c.line(layout::HomeRight, 420, layout::Right, 420);
+  Holiday list[48]; int n = holidays(fi.tm_year + 1900, list, 48);
   auto next = nextHoliday(list, n, fi);
-  c.text(layout::HomeRight, 412, "FINNISH HOLIDAY / FLAG DAY", 14);
-  if (next) {
-    snprintf(b, sizeof b, "%02d.%02d %s", next->day, next->month, next->name);
-    c.fit(layout::HomeRight, 436, 310, b, 16);
-  } else
-    c.text(layout::HomeRight, 436, "01.01 New Year's Day", 16);
-  c.line(24, layout::HomeLowerRule, layout::HomeLeftRight, layout::HomeLowerRule);
+  c.text(layout::HomeRight, 440, "FINNISH HOLIDAY / FLAG DAY", 14);
+  if (next) snprintf(b, sizeof b, "%02d.%02d %s", next->day, next->month, next->name);
+  else strlcpy(b, "01.01 New Year's Day", sizeof b);
+  c.fit(layout::HomeRight, 464, 312, b, 16);
+  c.line(12, layout::HomeLowerRule, layout::HomeLeftRight, layout::HomeLowerRule);
   if (m.weather.valid) {
     const auto &w = m.weather;
-    bool test = m.iconTest >= 0 && esp_timer_get_time() < m.iconTestUntilUs;
-    int code = test ? m.iconTest : w.code;
-    if (m.settings.animations || test)
-      c.animatedIcon(24, 336, 48, code, test ? true : w.daylight, phase);
-    else
-      c.icon(24, 336, 48, w.code, w.daylight);
     number(b, sizeof b, w.temp, "°C", 1);
-    c.text(80, 364, b, 28);
-    c.fit(24, 392, 184, test ? "ICON TEST / AUTO RESTORE" : condition(w.code), 16);
-    char feels[24], wind[24];
-    number(feels, sizeof feels, w.feels, " C");
-    number(wind, sizeof wind, w.wind, " m/s");
-    snprintf(b, sizeof b, "Feels %s", feels);
-    c.text(24, 412, b, 14);
-    snprintf(b, sizeof b, "Wind %s", wind);
-    c.text(24, 432, b, 14);
+    bool test=m.iconTest>=0&&esp_timer_get_time()<m.iconTestUntilUs;
+    int code=test?m.iconTest:w.code;bool daylight=test?true:w.daylight;
+    if (m.settings.animations||test) c.animatedIcon(12, 274, 64, code, daylight, phase);
+    else c.icon(12, 274, 64, code, daylight);
+    c.text(84, 314, b, 28);
+    c.fit(12, 352, 192, condition(w.code), 18);
+    char feels[24], wind[24]; number(feels, sizeof feels, w.feels, " C"); number(wind, sizeof wind, w.wind, " m/s");
+    snprintf(b, sizeof b, "Feels %s", feels); c.metricIcon(12, 378, 16, WeatherMetric::Temperature); c.text(36, 392, b, 16);
+    snprintf(b, sizeof b, "Wind %s", wind); c.metricIcon(12, 414, 16, WeatherMetric::Wind); c.text(36, 428, b, 16);
   } else {
-    c.fit(24, 356, 184, m.settings.location, 18);
-    c.text(24, 388, "Fetching weather...", 14);
-    if (m.weather.error[0])
-      c.fit(24, 420, 184, m.weather.error, 14);
+    c.fit(12, 312, 192, m.settings.location, 18);
+    c.text(12, 352, "Fetching weather...", 14);
+    if (m.weather.error[0]) c.fit(12, 392, 192, m.weather.error, 14);
   }
   renderHomeAstronomy(c, m.settings, now);
 }
 static int wrap(Canvas &c, int x, int baseline, int width, const char *text, int size,
                 int maxLines) {
-  char row[512] = {};
-  int rows = 0;
-  const char *start = text;
-  while (*start && rows < maxLines) {
-    int count = std::max(1, width / font(size).advance), bytes = 0, chars = 0, lastSpace = -1;
-    const char *p = start;
-    while (*p && chars < count) {
-      if (*p == ' ')
-        lastSpace = p - start;
-      uint8_t ch = *p;
-      int len = ch < 128 ? 1 : ch < 224 ? 2 : ch < 240 ? 3 : 4;
-      for (int j = 0; j < len && *p; j++)
-        p++;
-      chars++;
-      bytes = p - start;
-    }
-    if (*p && lastSpace > 0)
-      bytes = lastSpace;
-    bytes = std::min(bytes, 510);
-    memcpy(row, start, bytes);
-    row[bytes] = 0;
-    if (rows == maxLines - 1 && start[bytes]) {
-      c.fit(x, baseline + rows * (size + 8), width, start, size);
-    } else
-      c.text(x, baseline + rows * (size + 8), row, size);
-    start += bytes;
-    while (*start == ' ')
-      start++;
-    rows++;
-    if (!bytes)
-      break;
-  }
-  return rows;
+  return c.wrapped(x, baseline, width, text, size, maxLines, size + 8);
 }
 void renderMusic(Canvas &c, const Model &m, time_t now, int64_t us) {
   renderChrome(c, "NOW PLAYING / SPOTIFY", Page::Music, m);
   const auto &s = m.music;
   char b[128];
   if (s.valid && s.artValid)
-    c.image(24, 70, ART, ART, s.art);
+    c.image(12, 66, ART, ART, s.art);
   else {
-    c.box(24, 70, ART, ART);
-    c.circle(96, 142, 48, 2);
-    c.circle(96, 142, 10, 2);
+    c.box(12, 66, ART, ART);
+    c.circle(84, 138, 48, 2);
+    c.circle(84, 138, 10, 2);
   }
-  c.text(193, 90,
+  c.text(180, 90,
          !s.authorized ? "ACCOUNT NOT CONNECTED"
          : s.stale     ? "PLAYBACK DATA STALE"
          : !s.valid    ? "NO ACTIVE PLAYBACK"
          : s.playing   ? "PLAYING"
                        : "PAUSED",
          14);
-  wrap(c, 193, 130, 575,
+  wrap(c, 180, 130, 608,
        s.valid        ? s.title
        : s.authorized ? "Nothing playing yet"
                       : "Connect your Spotify account",
        24, 2);
-  c.fit(193, 192, 575,
+  c.fit(180, 192, 608,
         s.valid        ? s.artist
         : s.authorized ? "Start music on your phone or speaker."
                        : "One-time browser authorization",
@@ -228,21 +190,20 @@ void renderMusic(Canvas &c, const Model &m, time_t now, int64_t us) {
     uint32_t pos = playbackPosition(s, us);
     snprintf(b, sizeof b, "%u:%02u / %u:%02u", pos / 60000, pos / 1000 % 60, s.duration / 60000,
              s.duration / 1000 % 60);
-    c.text(193, 217, b, 14);
-  } else
-    c.text(193, 217, "No computer server needed after setup", 14);
-  c.line(24, 238, 775, 238);
-  c.text(24, 263, "LYRICS", 14);
+    c.text(180, 217, b, 14);
+  }
+  c.line(12, 238, 787, 238);
+  c.text(12, 263, "LYRICS", 14);
   int idx = currentLyric(s, us);
   if (s.valid && s.lyricStatus == LyricStatus::Timed && s.lineCount) {
     if (idx > 0)
-      c.fit(24, 294, 752, s.lines[idx - 1].text, 18);
+      c.fit(12, 302, 776, s.lines[idx - 1].text, 18);
     if (idx >= 0)
-      wrap(c, 24, 339, 752, s.lines[idx].text, 28, 2);
+      wrap(c, 12, 354, 776, s.lines[idx].text, 28, 2);
     else
-      c.text(24, 339, "Instrumental intro", 28);
+      c.text(12, 354, "Instrumental intro", 28);
     if (idx + 1 < s.lineCount)
-      c.fit(24, 420, 752, s.lines[idx + 1].text, 18);
+      c.fit(12, 450, 776, s.lines[idx + 1].text, 18);
   } else {
     const char *msg = !s.authorized                                ? "Waiting for authorization"
                       : s.lyricStatus == LyricStatus::Instrumental ? "Instrumental"
@@ -250,26 +211,26 @@ void renderMusic(Canvas &c, const Model &m, time_t now, int64_t us) {
                       : s.lyricStatus == LyricStatus::Missing      ? "No matching timed lyrics"
                       : s.lyricStatus == LyricStatus::Unavailable  ? "Lyrics service unavailable"
                                                                    : "Waiting for a track";
-    wrap(c, 24, 330, 752, msg, 24, 2);
-    c.fit(24, 391, 752,
-          s.error[0] ? s.error : "Timed lyrics: LRCLIB / matched by track, artist and duration",
+    wrap(c, 12, 330, 776, msg, 24, 2);
+    c.fit(12, 391, 776,
+          s.error[0] ? s.error : "",
           14);
   }
 }
 void renderForecast(Canvas &c, const Model &m, time_t now) {
   char heading[80];
-  snprintf(heading, sizeof heading, "%s / SEVEN DAY OUTLOOK", m.settings.location);
+  snprintf(heading, sizeof heading, "WEATHER / %s", m.settings.location);
   renderChrome(c, heading, Page::Forecast, m);
   const auto &w = m.weather;
   char b[128];
   if (!w.valid) {
-    c.text(24, 124, "Fetching forecast...", 32);
-    c.fit(24, 174, 752, w.error, 18);
+    c.text(12, 124, "Fetching forecast...", 32);
+    c.fit(12, 174, 776, w.error, 18);
     return;
   }
-  constexpr int left = 62, right = 776, top = 112, bottom = 248, dayWidth = 102;
+  constexpr int left = 50, right = 788, top = 108, bottom = 274;
   time_t first = w.days[0].epoch, end = w.days[6].epoch + 86400;
-  float lo = 100, hi = -100, rainMax = 1;
+  float lo = 94, hi = -100, rainMax = 1;
   for (int i = 0; i < w.hourCount; i++) {
     const auto &hour = w.hours[i];
     if (hour.epoch < first || hour.epoch >= end)
@@ -291,10 +252,12 @@ void renderForecast(Canvas &c, const Model &m, time_t now) {
   auto xx = [&](time_t t) {
     return left + int(double(t - first) / (end - first) * (right - left));
   };
-  c.text(24, 76, "TEMPERATURE / °C", 14);
+  c.metricIcon(12, 56, 16, WeatherMetric::Temperature);
+  c.text(36, 70, "TEMPERATURE / °C", 14);
   snprintf(b, sizeof b, "HOURLY RAIN / 0-%.1f mm%s", rainMax,
            now - w.fetched > 7200 ? " / CACHED" : "");
-  c.text(right - c.textWidth(b, 14), 76, b, 14);
+  c.metricIcon(right - c.textWidth(b, 14) - 22, 56, 16, WeatherMetric::Rain);
+  c.text(right - c.textWidth(b, 14), 70, b, 14);
   for (int v = int(ceilf(lo / 5)) * 5; v <= hi; v += 5) {
     int y = yy(v);
     snprintf(b, sizeof b, "%d", v);
@@ -302,12 +265,12 @@ void renderForecast(Canvas &c, const Model &m, time_t now) {
     c.dottedLine(left, y, right - left);
   }
   for (int d = 0; d < 7; d++) {
-    int x = left + d * dayWidth;
+    int x = left + (right-left)*d/7, dayWidth = (right-left)*(d+1)/7-(right-left)*d/7;
     auto local = inZone(w.days[d].epoch + 3600, m.settings.localZone);
     snprintf(b, sizeof b, "%s %02d", WEEK[local.tm_wday], local.tm_mday);
-    c.centered(x, 100, dayWidth, b, 16);
+    c.centered(x, 94, dayWidth, b, 16);
     if (d)
-      c.line(x, top, x, 424);
+      c.line(x, top, x, 466);
   }
   for (int i = 0; i < w.hourCount; i++) {
     const auto &hour = w.hours[i];
@@ -319,21 +282,21 @@ void renderForecast(Canvas &c, const Model &m, time_t now) {
         c.dot(x, y);
     if (isfinite(hour.rain) && hour.rain > 0) {
       int h = std::min(24, int(hour.rain / rainMax * 24) + 1);
-      c.rect(x, 280 - h, std::min(3, right - x), h);
+      c.rect(x, 310 - h, std::min(3, right - x), h);
     }
     if (i && w.hours[i - 1].epoch >= first && isfinite(w.hours[i - 1].temp) && isfinite(hour.temp))
       c.line(xx(w.hours[i - 1].epoch), yy(w.hours[i - 1].temp), x, yy(hour.temp), 2);
   }
-  c.line(left, 280, right - 1, 280);
+  c.line(left, 310, right - 1, 310);
   for (int d = 0; d < 7; d++) {
-    int x = left + d * dayWidth;
+    int x = left + (right-left)*d/7, dayWidth = (right-left)*(d+1)/7-(right-left)*d/7;
     const auto &q = w.days[d];
-    c.icon(x + (dayWidth - 40) / 2, 304, 40, q.code);
+    c.icon(x + (dayWidth - 40) / 2, 334, 40, q.code);
     if (isfinite(q.high) && isfinite(q.low))
       snprintf(b, sizeof b, "%d°/%d°", int(lroundf(q.high)), int(lroundf(q.low)));
     else
       strlcpy(b, "-- / --", sizeof b);
-    c.centered(x, 372, dayWidth, b, 20);
+    c.centered(x, 404, dayWidth, b, 20);
     char probability[16], rain[24];
     if (q.probability >= 0)
       snprintf(probability, sizeof probability, "%d%%", q.probability);
@@ -341,9 +304,11 @@ void renderForecast(Canvas &c, const Model &m, time_t now) {
       strlcpy(probability, "--%", sizeof probability);
     number(rain, sizeof rain, q.rain, "mm", 1);
     snprintf(b, sizeof b, "%s %s", probability, rain);
-    c.centered(x, 396, dayWidth, b, 14);
+    int rainWidth=22+c.textWidth(b,14),rainX=x+(dayWidth-rainWidth)/2;
+    c.metricIcon(rainX,418,16,WeatherMetric::Rain);c.text(rainX+22,432,b,14);
     number(b, sizeof b, q.wind, " m/s");
-    c.centered(x, 420, dayWidth, b, 14);
+    int windWidth=22+c.textWidth(b,14),windX=x+(dayWidth-windWidth)/2;
+    c.metricIcon(windX,446,16,WeatherMetric::Wind);c.text(windX+22,460,b,14);
   }
 }
 } // namespace ink

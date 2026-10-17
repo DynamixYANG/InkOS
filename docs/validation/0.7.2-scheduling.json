@@ -1,0 +1,145 @@
+{
+  "version": "0.7.2",
+  "healthy": true,
+  "startup_checks": 180,
+  "firmware_sha256": "2e00997405ec62cc403523a80143cc0648839dba0cc3c777865306a3e035421b",
+  "measurement": "USB navigation commands through the same target-publication path; host log timestamps plus firmware stage counters; not a measurement of physical rotary edge latency.",
+  "baseline": {
+    "version": "0.7.1",
+    "cases": [
+      {
+        "page": 6,
+        "title_ms": 1093,
+        "accept_ms": 1640,
+        "visible_hold_ms": 547,
+        "full_ms": 4172,
+        "dispatch_us": null
+      },
+      {
+        "page": 0,
+        "title_ms": 1094,
+        "accept_ms": 1657,
+        "visible_hold_ms": 563,
+        "full_ms": 4172,
+        "dispatch_us": null
+      },
+      {
+        "page": 6,
+        "title_ms": 1094,
+        "accept_ms": 1656,
+        "visible_hold_ms": 562,
+        "full_ms": 4172,
+        "dispatch_us": null
+      },
+      {
+        "page": 0,
+        "title_ms": 1094,
+        "accept_ms": 1641,
+        "visible_hold_ms": 547,
+        "full_ms": 4171,
+        "dispatch_us": null
+      }
+    ],
+    "median_title_ms": 1094.0,
+    "median_accept_ms": 1648.5,
+    "median_visible_hold_ms": 554.5,
+    "idle_full_model_snapshots_2s": null,
+    "settings_preserved": true,
+    "final_page": 0
+  },
+  "optimized": {
+    "version": "0.7.2",
+    "cases": [
+      {
+        "page": 6,
+        "title_ms": 1047,
+        "accept_ms": 1141,
+        "full_ms": 4172,
+        "dispatch_us": 4575,
+        "host_visible_hold_ms": 94,
+        "visible_hold_ms": 102.807
+      },
+      {
+        "page": 0,
+        "title_ms": 1031,
+        "accept_ms": 1141,
+        "full_ms": 4172,
+        "dispatch_us": 4635,
+        "host_visible_hold_ms": 110,
+        "visible_hold_ms": 100.79
+      },
+      {
+        "page": 6,
+        "title_ms": 1047,
+        "accept_ms": 1141,
+        "full_ms": 4172,
+        "dispatch_us": 4683,
+        "host_visible_hold_ms": 94,
+        "visible_hold_ms": 102.801
+      },
+      {
+        "page": 0,
+        "title_ms": 1047,
+        "accept_ms": 1141,
+        "full_ms": 4172,
+        "dispatch_us": 4644,
+        "host_visible_hold_ms": 94,
+        "visible_hold_ms": 100.781
+      }
+    ],
+    "median_title_ms": 1047.0,
+    "median_accept_ms": 1141.0,
+    "median_visible_hold_ms": 101.7955,
+    "idle_full_model_snapshots_2s": 0,
+    "settings_preserved": true,
+    "final_page": 0,
+    "median_dispatch_us": 4639.5,
+    "host_timestamp_note": "USB log delivery batches introduce a few milliseconds of host timing jitter; minimum title hold is verified by firmware timestamps."
+  },
+  "accept_latency_reduction_percent": 30.79,
+  "stress": {
+    "version": "0.7.2",
+    "burst_targets": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "burst_previews": [
+      1,
+      6
+    ],
+    "burst_commits": [
+      6
+    ],
+    "long_quiet_ms": 2000,
+    "long_quiet_observed_ms": 2032,
+    "prepared_model_snapshots": 1,
+    "encoder_lock_preserved": true,
+    "settings_feeds_energy_preserved": true,
+    "final_page": 0
+  },
+  "reverse": {
+    "reverse_actions": [
+      "next",
+      "next",
+      "prev",
+      "prev",
+      "prev",
+      "next"
+    ],
+    "previews": [
+      1,
+      0
+    ],
+    "commits": [
+      0
+    ],
+    "settings_preserved": true,
+    "final_page": 0,
+    "framebuffer_verified_800x480": true
+  },
+  "physical_encoder_user_acceptance_pending": true
+}

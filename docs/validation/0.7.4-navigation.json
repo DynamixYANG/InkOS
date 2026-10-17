@@ -1,0 +1,84 @@
+{
+  "version": "0.7.4",
+  "experimental": true,
+  "health": {
+    "version": "0.7.4",
+    "healthy": true,
+    "startup_checks": 188,
+    "settings_feeds_energy_preserved": true,
+    "font_archive_preserved": true,
+    "default_encoder_lock_ms": 2000,
+    "firmware_sha256": "73dc1f87654398850451a915a7f2af99bd4509cc03737322277aaee98f4f23d0",
+    "slot": "ota_1"
+  },
+  "timing": {
+    "version": "0.7.4",
+    "experiment": "title-only 0.5s six-frame differential waveform",
+    "cases": [
+      {
+        "page": 6,
+        "title_present_ms": 483,
+        "selection_to_visible_ms": 500,
+        "selection_to_full_start_ms": 593,
+        "full_ms": 4172,
+        "window": [
+          8,
+          13,
+          176,
+          17
+        ]
+      },
+      {
+        "page": 0,
+        "title_present_ms": 483,
+        "selection_to_visible_ms": 500,
+        "selection_to_full_start_ms": 609,
+        "full_ms": 4172,
+        "window": [
+          8,
+          13,
+          176,
+          17
+        ]
+      },
+      {
+        "page": 2,
+        "title_present_ms": 483,
+        "selection_to_visible_ms": 500,
+        "selection_to_full_start_ms": 594,
+        "full_ms": 4172,
+        "window": [
+          8,
+          13,
+          160,
+          17
+        ]
+      },
+      {
+        "page": 0,
+        "title_present_ms": 483,
+        "selection_to_visible_ms": 500,
+        "selection_to_full_start_ms": 594,
+        "full_ms": 4172,
+        "window": [
+          8,
+          13,
+          160,
+          17
+        ]
+      }
+    ],
+    "median_title_present_ms": 483.0,
+    "median_selection_to_visible_ms": 500.0,
+    "median_selection_to_full_start_ms": 594.0,
+    "factory_full_retained": true,
+    "controller_windows_title_only": true,
+    "optical_body_quality_pending": true,
+    "settings_feeds_energy_preserved": true,
+    "visual_acceptance_pending": false,
+    "final_page": 0,
+    "user_visual_feedback": "Looks acceptable; user requested retaining this version while updating weather icons."
+  },
+  "title_visual_accepted_by_user": true,
+  "firmware_sha256": "73dc1f87654398850451a915a7f2af99bd4509cc03737322277aaee98f4f23d0"
+}

@@ -35,12 +35,12 @@ void renderEnergy(Canvas &c, const Model &m, time_t now) {
   const auto &e = m.energy;
   char b[128];
   if (!e.enabled) {
-    c.text(24, 111, "Electricity display is disabled", 24);
-    c.text(24, 151, "Enable it in InkOS Studio / Energy.", 18);
+    c.text(12, 111, "Electricity display is disabled", 24);
+    c.text(12, 151, "Enable it in InkOS Studio / Energy.", 18);
     return;
   }
   if (!Clock::valid()) {
-    c.text(24, 110, "Waiting for clock sync", 24);
+    c.text(12, 110, "Waiting for clock sync", 24);
     return;
   }
   // Equal elapsed hours on either side, including midnight and DST transitions.
@@ -64,13 +64,13 @@ void renderEnergy(Canvas &c, const Model &m, time_t now) {
     }
   }
   if (lowest < 0) {
-    c.text(24, 110, "Waiting for published prices", 24);
-    c.fit(24, 150, 752, *e.error ? e.error : "Finnish price area / waiting for data", 16);
+    c.text(12, 110, "Waiting for published prices", 24);
+    c.fit(12, 150, 776, *e.error ? e.error : "Finnish price area / waiting for data", 16);
     return;
   }
   // Three equal summary columns; extrema refer to the visible rolling window.
   for (int k = 0; k < 3; k++) {
-    int x = 24 + k * 256, index = k == 0 ? lowest : k == 1 ? radius : highest;
+    int x = 12 + k * 260, index = k == 0 ? lowest : k == 1 ? radius : highest;
     double value = values[index];
     c.text(x, 80, k == 0 ? "WINDOW LOW" : k == 1 ? "CURRENT / ct/kWh" : "WINDOW HIGH", 14);
     if (isfinite(value))
@@ -84,7 +84,7 @@ void renderEnergy(Canvas &c, const Model &m, time_t now) {
     snprintf(b, sizeof b, "%02d.%02d / %s:00", date.tm_mday, date.tm_mon + 1, label);
     c.text(x, 148, b, 16);
   }
-  constexpr int gx = 24, gy = 192, gw = 752, gh = 148;
+  constexpr int gx = 12, gy = 188, gw = 776, gh = 176;
   double bottom = std::min(0., low), top = std::max(1., high);
   if (top - bottom < 1)
     top = bottom + 1;
@@ -111,24 +111,24 @@ void renderEnergy(Canvas &c, const Model &m, time_t now) {
     }
     hourLabel(b, sizeof b, start + i * 3600);
     if (i == radius) {
-      c.rect(mid - 14, 350, 29, 22);
-      c.text(mid - c.textWidth(b, 14) / 2, 366, b, 14, false);
-      c.centered(cx - 8, 392, next - cx + 16, "NOW", 14);
+      c.rect(mid - 14, 374, 29, 22);
+      c.text(mid - c.textWidth(b, 14) / 2, 390, b, 14, false);
+      c.centered(cx - 8, 414, next - cx + 16, "NOW", 14);
     } else
-      c.centered(cx, 366, next - cx, b, 14);
+      c.centered(cx, 390, next - cx, b, 14);
   }
   auto a = Clock::finland(start), z = Clock::finland(start + (count - 1) * 3600);
   snprintf(b, sizeof b, "%02d.%02d / -12h", a.tm_mday, a.tm_mon + 1);
-  c.text(24, 392, b, 14);
+  c.text(12, 414, b, 14);
   snprintf(b, sizeof b, "+12h / %02d.%02d", z.tm_mday, z.tm_mon + 1);
-  c.text(776 - c.textWidth(b, 14), 392, b, 14);
-  c.line(24, 404, 775, 404);
+  c.text(788 - c.textWidth(b, 14), 414, b, 14);
+  c.line(12, 426, 787, 426);
   snprintf(b, sizeof b, "VAT %.1f%%   MARGIN %.2f ct   TRANSMISSION %.2f ct", e.vatPercent,
            e.marginCt, e.transmissionCt);
-  c.text(24, 424, b, 14);
+  c.text(12, 446, b, 14);
   snprintf(b, sizeof b, "Hourly / ct/kWh / fees %s VAT%s%s",
            e.feesIncludeVat ? "include" : "exclude", e.error[0] ? " / CACHED" : "",
            gaps ? " / unpublished hours left blank" : "");
-  c.fit(24, 442, 752, b, 14);
+  c.fit(12, 468, 776, b, 14);
 }
 } // namespace ink

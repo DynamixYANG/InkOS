@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="InkOS.Studio.Views.NetworkView">
+ <StackPanel>
+  <TextBlock Text="NETWORK / 06" Classes="label"/>
+  <TextBlock Text="Connected, your way." Classes="title" Margin="0,0,0,10"/>
+  <TextBlock Text="Configure over USB or an IP connection. The screen runs independently after setup." Classes="muted" Margin="0,0,0,28"/>
+  <Border Classes="section"><StackPanel Spacing="12">
+   <TextBlock Text="WI-FI / 2.4 GHz" Classes="label"/>
+   <TextBlock Text="{Binding WifiState}" Classes="muted"/>
+   <TextBlock Text="Network name" Classes="label"/>
+   <TextBox x:Name="WifiNameInput" Text="{Binding WifiSsid,Mode=TwoWay}" PlaceholderText="SSID" IsEnabled="{Binding !IsBusy}"/>
+   <TextBlock Text="Password action" Classes="label"/>
+   <ComboBox x:Name="WifiModeInput" SelectedIndex="{Binding WifiPasswordMode,Mode=TwoWay}" HorizontalAlignment="Stretch" IsEnabled="{Binding !IsBusy}"><ComboBoxItem Content="Keep stored password (same network)"/><ComboBoxItem Content="Replace password"/><ComboBoxItem Content="Open network (no password)"/></ComboBox>
+   <TextBox x:Name="WifiPasswordInput" Text="{Binding WifiPassword,Mode=TwoWay}" PasswordChar="●" PlaceholderText="New password · only for Replace" IsEnabled="{Binding !IsBusy}"/>
+   <Button Classes="Outline" Command="{Binding SaveWifiCommand}" HorizontalAlignment="Left"><TextBlock Text="Save Wi-Fi" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+   <TextBlock Text="Wi-Fi is saved separately. Changing it may change the device IP; USB remains available." Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+  <Border Classes="section"><StackPanel Spacing="12">
+   <TextBlock Text="IP ACCESS / USB PAIRING" Classes="label"/>
+   <TextBlock Text="Connect over USB, then enable IP access. Use the device IP and pairing key on this or another computer. Settings are encrypted with AES-256-GCM." Classes="muted"/>
+   <Grid ColumnDefinitions="*,*" ColumnSpacing="12"><StackPanel Spacing="8"><TextBlock Text="Device IP address" Classes="label"/><TextBox Text="{Binding NetworkAddress,Mode=TwoWay}" PlaceholderText="192.168.1.100" IsEnabled="{Binding !IsBusy}"/></StackPanel><StackPanel Grid.Column="1" Spacing="8"><TextBlock Text="Pairing key" Classes="label"/><TextBox x:Name="PairingKeyInput" Text="{Binding PairingKey,Mode=TwoWay}" PasswordChar="{Binding PairingKeyMask}" IsEnabled="{Binding !IsBusy}"/></StackPanel></Grid>
+   <CheckBox Content="Show pairing key" IsChecked="{Binding ShowPairingKey,Mode=TwoWay}"/>
+   <WrapPanel Orientation="Horizontal"><Button Classes="Outline" Command="{Binding PairNetworkCommand}" Margin="0,0,10,8"><TextBlock Text="Enable / replace key" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button><Button Classes="Ghost" Command="{Binding DisableNetworkCommand}" Margin="0,0,0,8"><TextBlock Text="Disable IP access" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button></WrapPanel>
+   <TextBlock Text="Pairing and revocation require USB. The key stays in app memory only; keep a private copy for later. All configuration pages work over IP. For access outside your LAN, use a VPN." Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+  <Border Classes="section"><StackPanel Spacing="12">
+   <TextBlock Text="FIRMWARE / A + B" Classes="label"/>
+   <TextBlock Text="{Binding FirmwareLabel}" Classes="muted"/>
+   <WrapPanel><Button Classes="Outline" Click="ChooseFirmware" IsEnabled="{Binding CanChooseFirmware}" Margin="0,0,12,0"><TextBlock Text="Choose OTA package" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button><Button Classes="Outline" Command="{Binding UpgradeFirmwareCommand}"><TextBlock Text="Upgrade + restart" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button></WrapPanel>
+   <ProgressBar Value="{Binding FirmwareProgress}" Minimum="0" Maximum="100" Height="3" MinHeight="3" Foreground="#181818" Background="#E8E8E8"/>
+   <TextBlock Text="{Binding FirmwareState}" Classes="muted"/>
+   <TextBlock Text="Connect over paired IP. Keep the screen powered until boot health is confirmed. Wi-Fi, calendars and Spotify settings are retained." Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+ </StackPanel>
+</UserControl>

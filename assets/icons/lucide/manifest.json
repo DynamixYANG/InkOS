@@ -1,0 +1,37 @@
+{
+  "repository": "lucide-icons/lucide",
+  "commit": "1ef60af944de207e0d5176905a0759ba12e6ee8d",
+  "style": "thin rounded stroke",
+  "stroke_pixels": {
+    "16": 1.0,
+    "24": 1.0,
+    "40": 1.25,
+    "64": 2.0
+  },
+  "native_sizes": [
+    16,
+    24,
+    40,
+    64
+  ],
+  "sha256": {
+    "sun": "a3955c8b0425fcc5c9ba12d2bdd77fe53b2cd5dd05e7742a56f342e996fb2ef8",
+    "moon-star": "276b71e005c4dbb7fffdfe05d0e66628675b48f4f56bfb88aed59261f3b61e56",
+    "cloud-sun": "d3d0b5519e3e9e6073bc6d875fcb2b8d0a0c0d0062602490d444ef6a08bb2ab0",
+    "cloud-moon": "8233994cbdc0b3dfb5d234be026d4d038c731a020da4b5a65851fde0e956ee6c",
+    "cloud": "28a34022ed00177eb1f218eea5d2b7af30d09b529187fe32219e4dd8ea2b9740",
+    "cloud-fog": "68a247163f7501be38045284660b2c19b957e197d510e8169313075309da879a",
+    "cloud-rain": "4230ba9d28d0a02c088ec0b21079b63aed9f2b7ee8493588adf34ee144bc307b",
+    "cloud-rain-wind": "9f7e0b24e7e7d950664843c44f42f2087f547753fbf03a2e27614d15dd5c1b2e",
+    "cloud-snow": "cdbb307c38c6f6781dd8169bc92c28cae16b4fb77d6c5d88898dd92698ad2dbc",
+    "cloud-drizzle": "1d19c1c62d82734241a9d8d5b3585a2c93ff70cb9d8cf47127cb1a18aa6c54b4",
+    "cloud-lightning": "9966e87d16d255878fd34efa1174cf1756fb5755c1f63e7ff1df4db5d2fefc36",
+    "cloud-hail": "be333c2573ef172e969ee7c86e44adb7be2e4e72de60a9d756f41ec7afd977d9",
+    "thermometer": "a56c95062445d52d95c51a77c4959d5a022539a0194205cc2ce2e9ce8f35847b",
+    "droplet": "abca4df60f91c605d945c6fe5ee0e6c919b53116d81e268f4581f8841bf24751",
+    "wind": "eb35f6f00125b779a993c21ee761432faf8fc3210272c94448f63e2196d419b7"
+  },
+  "derivatives": {
+    "heavy snow": "add six small snowflake crosses"
+  }
+}

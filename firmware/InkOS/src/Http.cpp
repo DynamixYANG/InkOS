@@ -1,4 +1,5 @@
 #include "Services.h"
+#include "CalDav.h"
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <esp_heap_caps.h>
@@ -115,10 +116,10 @@ bool request(const String &url, HttpResponse &r, size_t maximum, const String &a
     WiFiClientSecure tls;
     tls.useBuiltinCACertBundle();
     HTTPClient http;
-    http.setConnectTimeout(6000);
-    http.setTimeout(6000);
+    http.setConnectTimeout(options.timeoutMs);
+    http.setTimeout(options.timeoutMs);
     http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
-    if (!current.startsWith("https://") || !http.begin(tls, current)) {
+    if (!current.startsWith("https://") || (options.icloudOnly && !validICloudUrl(current)) || !http.begin(tls, current)) {
       r.status = -1;
       return false;
     }
@@ -137,7 +138,11 @@ bool request(const String &url, HttpResponse &r, size_t maximum, const String &a
       http.addHeader("If-None-Match", options.etag);
     if (options.lastModified.length())
       http.addHeader("If-Modified-Since", options.lastModified);
-    if (body.length()) {
+    if (options.method.length()) {
+      if (options.depth.length()) http.addHeader("Depth", options.depth);
+      http.addHeader("Content-Type", options.contentType);
+      r.status = http.sendRequest(options.method.c_str(), body);
+    } else if (body.length()) {
       http.addHeader("Content-Type", "application/x-www-form-urlencoded");
       r.status = http.POST(body);
     } else
@@ -157,7 +162,8 @@ bool request(const String &url, HttpResponse &r, size_t maximum, const String &a
       current = next;
       continue;
     }
-    r.retrySeconds = http.header("Retry-After").toInt();
+    r.retryAfter = http.header("Retry-After");
+    r.retrySeconds = r.retryAfter.toInt();
     r.etag = http.header("ETag");
     r.lastModified = http.header("Last-Modified");
     r.expires = http.header("Expires");

@@ -1,5 +1,7 @@
 # 硬件与连接
 
+当前 0.5 的分区、U5 外部 Flash 引脚与首次迁移请以 [OTA 文档](OTA.md) 为准；本文 factory 分区和 `flash.py` 操作保留作历史 0.4 恢复参考。
+
 ## 已验证配置
 
 | 项目 | 规格 |
@@ -29,8 +31,20 @@
 | KEY1 | 2 | 上一页，INPUT_PULLUP，按下为低 |
 | KEY2 | 3 | 下一页 |
 | KEY3 | 5 | 主页 |
+| 编码器 A | 41 | INPUT_PULLUP，A/B 均以 CHANGE 中断采集 |
+| 编码器 B | 42 | A 先变化对应下一页，反向对应上一页 |
+| BAT_ADC | 1 | 电池 1:2 分压，使用校准 ADC 毫伏读数 |
+| ADC_EN | 6 | 高有效，采样后拉低关闭分压电路 |
 
 映射源于 `Panel.cpp` 和 `Runtime.cpp`。SPI 为 Mode 0、MSB first，10 MHz。连线改变时先单独确认驱动，再验证上层页面。
+
+0.7 起编码器两相输入解码一个完整 Gray-code 周期后换一页，拒绝不合法跳变、往返抖动和未完成周期。按键接原 KEY3（GPIO5）与 GND，按下回 Home；原 KEY1/2 继续可用，但屏幕不再显示按键栏。A/B 与按钮仅接 3.3 V 逻辑并共地，不要向 GPIO 输入 5 V。旋转方向取决于实物接线，交换 A/B 会反转方向。
+
+电池采样参考 [Seeed 官方 Arduino cookbook](https://wiki.seeedstudio.com/ogdiy_kit_works_with_arduino/#battery-voltage-monitoring)：GPIO6 拉高、等待 10 ms、平均 30 次 GPIO1 读数再关闭；本固件使用 eFuse 校准毫伏值乘 2，而非固定 3.6 V 标尺，也不叠加示例针对原始 ADC 的 0.968 经验修正。每分钟采样一次，按单节锂电池近似放电曲线估算百分比。充电、负载和温度会影响估值；这不是库仑计，也没有独立充电／电池存在检测引脚。未连接电池／异常电压显示电池加斜线，不显示百分比，不伪装成精确剩余容量。
+
+外部 U5 ZB25VQ32 与屏幕使用不同的 SPI 总线。这台实板经 GPIO 电平辨识与 `5E4016` ID 读取验证：**CLK=GPIO11、MOSI=GPIO13、MISO=GPIO12、CS=GPIO40**，其中 CLK/MOSI 与提供的原理图标注相反。电源使能仍为 GPIO43。100 kHz 至 10 MHz 六档读取均通过，详细手册核对和测试边界见 [EXTERNAL-FLASH](EXTERNAL-FLASH.md)。这是当前实板的验证结果，不应直接推定所有板卡版本都相同。
+
+0.6 起，U5 的完整 4 MiB 用于 LittleFS。内部 16 MiB 则保留 NVS/OTA 元数据、两个 5.9375 MiB 固件槽和 4 MiB 压缩中文字库。迁移及失败恢复见 [OTA](OTA.md)。源文件系统完整备份、外部芯片原始备份及校验通过后才切换布局；运行时禁止挂载失败后自动格式化。
 
 ## 首次连接与下载模式
 
@@ -56,3 +70,5 @@
 烧录仅写 bootloader `0x0`、partition table `0x8000`、application `0x20000`。不写 `0xe000` 的默认 boot_app0，不上传 merged.bin，不运行 erase-flash。第一次适配其他固件前还应另存完整 Flash，以便恢复；工具自动保存的前 `0x20000` 字节只包含启动区及 NVS，并不是完整固件备份。
 
 原始备份包含 Wi-Fi 等私人配置，保存在 `.local/backups/` 或仓库外，不进入 Git 与 Release。
+
+0.7.1: Encoder edges use a single GPIO input-register snapshot for A/B, avoiding mixed states from sequential GPIO reads. Full-cycle/bounce rejection is retained. Input publication runs separately from HTTP/USB handling; the configurable encoder-only lock discards turns at capture time and rechecks before page publication. Its default duration is 2000 ms from full-page acceptance.

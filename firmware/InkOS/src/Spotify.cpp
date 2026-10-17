@@ -1,5 +1,6 @@
+#include "Text.h"
 #include "Artwork.h"
-#include "Lyrics.h"
+#include "LyricsResolver.h"
 #include "Services.h"
 #include <algorithm>
 #include <cJSON.h>
@@ -36,15 +37,6 @@ static String encode(const String &s) {
       r += hex[c >> 4];
       r += hex[c & 15];
     }
-  }
-  return r;
-}
-static String normalized(const char *s) {
-  String r;
-  for (; *s; s++) {
-    uint8_t c = *s;
-    if (c >= 128 || isalnum(c))
-      r += char(c < 128 ? tolower(c) : c);
   }
   return r;
 }
@@ -86,36 +78,6 @@ static void decodeCover(const char *url, Music &out) {
     out.artValid = true;
     out.artRevision++;
   }
-}
-static void fetchLyrics(Music &m, const char *leadArtist) {
-  m.lineCount = 0;
-  m.lyricStatus = LyricStatus::Missing;
-  String u = "https://lrclib.net/api/get?track_name=" + encode(m.title) +
-             "&artist_name=" + encode(leadArtist) + "&album_name=" + encode(m.album) +
-             "&duration=" + String((m.duration + 500) / 1000);
-  HttpResponse r;
-  if (!request(u, r, 196608) || r.status != 200) {
-    m.lyricStatus = r.status == 404 ? LyricStatus::Missing : LyricStatus::Unavailable;
-    return;
-  }
-  cJSON *j = cJSON_Parse((char *)r.bytes);
-  if (!j) {
-    m.lyricStatus = LyricStatus::Unavailable;
-    return;
-  }
-  bool match = normalized(s(j, "trackName")) == normalized(m.title) &&
-               normalized(s(j, "artistName")) == normalized(leadArtist) &&
-               fabs(n(j, "duration", -100) - m.duration / 1000.0) <= 2;
-  if (match) {
-    if (cJSON_IsTrue(f(j, "instrumental")))
-      m.lyricStatus = LyricStatus::Instrumental;
-    else if (*s(j, "syncedLyrics")) {
-      parseTimedLyrics(s(j, "syncedLyrics"), m);
-      m.lyricStatus = m.lineCount ? LyricStatus::Timed : LyricStatus::Missing;
-    } else if (*s(j, "plainLyrics"))
-      m.lyricStatus = LyricStatus::Untimed;
-  }
-  cJSON_Delete(j);
 }
 void updateSpotify() {
   auto cfg = credentials();
@@ -212,9 +174,9 @@ void updateSpotify() {
   pending->duration = duration;
   pending->sampleUs = began + (esp_timer_get_time() - began) / 2;
   strlcpy(pending->id, s(item, "id"), sizeof pending->id);
-  strlcpy(pending->title, s(item, "name"), sizeof pending->title);
+  copyUtf8(pending->title, s(item, "name"), sizeof pending->title);
   auto album = f(item, "album");
-  strlcpy(pending->album, s(album, "name"), sizeof pending->album);
+  copyUtf8(pending->album, s(album, "name"), sizeof pending->album);
   const auto artists = f(item, "artists");
   const char *lead = s(cJSON_GetArrayItem(artists, 0), "name");
   String all;
@@ -223,7 +185,7 @@ void updateSpotify() {
       all += ", ";
     all += s(cJSON_GetArrayItem(artists, i), "name");
   }
-  strlcpy(pending->artist, all.c_str(), sizeof pending->artist);
+  copyUtf8(pending->artist, all.c_str(), sizeof pending->artist);
   if (changed) {
     pending->artValid = false;
     pending->lineCount = 0;
@@ -243,14 +205,21 @@ void updateSpotify() {
     if (*image)
       decodeCover(image, *pending);
   }
+  String leadName(lead);
+  cJSON_Delete(j);
+  if (credentials().authRevision != cfg.authRevision) return;
   if (changed || (pending->lyricStatus != LyricStatus::Timed && now > lyricRetry)) {
-    fetchLyrics(*pending, lead);
+    // Publish the current track immediately; network lyric fallback must not hold up playback display.
+    pending->lyricStatus = LyricStatus::Waiting; pending->lineCount = 0; pending->revision++;
+    { Guard g(modelMutex); memcpy(&model->music, pending, sizeof(Music)); }
+    invalidate();
+    resolveTrackLyrics(*pending, leadName.c_str());
     lyricRetry = now + 300000000LL;
     stateChange = true;
   }
   if (changed || stateChange || correction)
     pending->revision++;
-  cJSON_Delete(j);
+  if (credentials().authRevision != cfg.authRevision) return;
   {
     Guard g(modelMutex);
     memcpy(&model->music, pending, sizeof(Music));

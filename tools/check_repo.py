@@ -24,7 +24,7 @@ def main():
         rel = path.relative_to(ROOT)
         if path.suffix.lower() in {'.bin', '.elf', '.map', '.pdb', '.zip', '.log', '.pyc'}:
             errors.append(f'{rel}: generated/private artifact outside an ignored output directory')
-        if path.suffix.lower() in {'.ttf', '.png', '.gif'}:
+        if path.suffix.lower() in {'.ttf', '.otf', '.png', '.gif'}:
             continue
         try:
             body = path.read_text(encoding='utf-8')

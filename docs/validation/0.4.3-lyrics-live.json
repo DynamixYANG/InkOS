@@ -1,0 +1,44 @@
+{
+  "firmware": "0.4.3",
+  "fixtures": [
+    {
+      "fixture": 0,
+      "source": "lrclib_search",
+      "timed": true,
+      "lines": 49,
+      "requests": 1,
+      "candidates": 20,
+      "match_score": 150,
+      "lrclib_http": 200,
+      "netease_http": 0,
+      "deferred": false,
+      "passed": true
+    },
+    {
+      "fixture": 1,
+      "source": "netease",
+      "timed": true,
+      "lines": 72,
+      "requests": 2,
+      "candidates": 10,
+      "match_score": 160,
+      "lrclib_http": 0,
+      "netease_http": 200,
+      "deferred": false,
+      "passed": true
+    },
+    {
+      "fixture": 2,
+      "source": "netease",
+      "timed": true,
+      "lines": 72,
+      "requests": 3,
+      "candidates": 10,
+      "match_score": 160,
+      "lrclib_http": 503,
+      "netease_http": 200,
+      "deferred": true,
+      "passed": true
+    }
+  ]
+}

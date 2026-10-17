@@ -1,0 +1,78 @@
+{
+  "firmware": "0.4.2",
+  "date": "2026-10-17",
+  "application_sha256": "cbcf25c678248de87de346954d355fe902a22bd84b573235a419e8bc336e6ed3",
+  "application_size_bytes": 10196272,
+  "startup_selftest": {
+    "passed": 90,
+    "total": 90,
+    "version": "0.4.2"
+  },
+  "font_provider": {
+    "source": "https://github.com/notofonts/noto-cjk",
+    "file": "NotoSansCJKsc-Light.otf",
+    "sha256": "e78bbbe1573bbb006156c1198f5c8cd6329470cb6e0b6702c7a3c83913db4abf",
+    "license": "OFL-1.1",
+    "family": "Noto Sans CJK SC Light",
+    "sizes": {
+      "14": {
+        "glyphs": 28400,
+        "bitmap_bytes": 703763
+      },
+      "18": {
+        "glyphs": 28400,
+        "bitmap_bytes": 1148907
+      },
+      "24": {
+        "glyphs": 28400,
+        "bitmap_bytes": 2007492
+      },
+      "28": {
+        "glyphs": 28400,
+        "bitmap_bytes": 2721074
+      }
+    },
+    "raster": "FreeType native-size monochrome, no antialiasing or runtime scaling",
+    "coverage": "BMP CJK unified/Extension A/compatibility ideographs, Chinese punctuation, kana and Bopomofo; no emoji or supplementary-plane ideographs",
+    "pillow": "12.3.0",
+    "freetype": "2.14.3"
+  },
+  "synthetic_previews": [
+    {
+      "file": "../images/chinese/music-chinese.png",
+      "sha256": "6e352ecb297cfcf0ea3f6c1be59fc467e4d567c5d0cdca7993849ec8c508088c"
+    },
+    {
+      "file": "../images/chinese/week-chinese.png",
+      "sha256": "8ee8665714d5753eeacbca1fbc4d8d588d2af0181d91f35ff87a3ebc72753368"
+    },
+    {
+      "file": "../images/chinese/home-chinese.png",
+      "sha256": "9dd471c4eac3aa62efdee81eab98f7047c4dc1f2f67bac4b7d40ac3cb0c15b5a"
+    }
+  ],
+  "latin_regression": {
+    "home-weeks": {
+      "unchanged": true,
+      "changed_bbox": null
+    },
+    "week-grid": {
+      "unchanged": true,
+      "changed_bbox": null
+    }
+  },
+  "configuration_fingerprint_unchanged": true,
+  "runtime": {
+    "version": "0.4.2",
+    "page": 0,
+    "wifi": true,
+    "spotify": true,
+    "calendar_configured": true,
+    "calendar_events": 5,
+    "calendar_stale": false
+  },
+  "live_music_week_home_frames_captured_privately": true,
+  "refresh_waveforms_unchanged": true,
+  "original_latin_font_data_unchanged": true,
+  "long_term_physical_contrast_tested_for_this_change": false
+}

@@ -5,6 +5,7 @@ internal static class Program {
  [STAThread] public static int Main(string[] args){
   try {
    if(args.Contains("--self-test"))return StudioChecks.SelfTest();
+   if(args.Contains("--network-smoke"))return NetworkChecks.DeviceSmokeAsync().GetAwaiter().GetResult();
    if(args.Contains("--device-smoke"))return StudioChecks.DeviceSmokeAsync().GetAwaiter().GetResult();
    if(args.Contains("--render-preview")){
     AppBuilder.Configure<App>().UseSkia().UseHeadless(new AvaloniaHeadlessPlatformOptions{UseHeadlessDrawing=false}).SetupWithoutStarting();

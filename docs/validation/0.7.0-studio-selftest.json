@@ -1,0 +1,9 @@
+{
+  "passed": 12,
+  "total": 12,
+  "firmware_package_and_upload": true,
+  "icloud_discovery_and_security": true,
+  "navigation_delay_validation": true,
+  "firmware_07_compatibility": true,
+  "framework": "ShadUI 0.2.4 / Avalonia 12.1 / .NET 10"
+}

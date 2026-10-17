@@ -1,6 +1,8 @@
 #include "Services.h"
 #include "Zones.h"
+#include "CalDav.h"
 #include <Preferences.h>
+#include <esp_timer.h>
 namespace ink {
 static SemaphoreHandle_t configMutex;
 static Credentials config;
@@ -22,10 +24,28 @@ void loadConfiguration() {
   n.begin("wifi", true);
   config.ssid = n.getString("ssid", "");
   config.password = n.getString("pass", "");
+  auto wifi = cJSON_Parse(n.getString("network1", "").c_str());
+  if (wifi) {
+    config.ssid = stringAt(wifi, "ssid"); config.password = stringAt(wifi, "password");
+    cJSON_Delete(wifi);
+  }
   n.end();
   n.begin("inkos", true);
   config.clientId = n.getString("client_id", "");
   config.refreshToken = n.getString("refresh", "");
+  auto icloud = cJSON_Parse(n.getString("icloud1", "").c_str());
+  if (icloud) {
+    config.icloud.enabled = cJSON_IsTrue(cJSON_GetObjectItem(icloud,"enabled"));
+    config.icloud.username = stringAt(icloud,"username");config.icloud.password = stringAt(icloud,"password");
+    config.icloud.calendarUrl = stringAt(icloud,"calendar_url");config.icloud.calendarName = stringAt(icloud,"calendar_name");
+    if (!validICloudUrl(config.icloud.calendarUrl) || config.icloud.password.isEmpty()) config.icloud.enabled=false;
+    cJSON_Delete(icloud);
+  }
+  config.pageSwitchDelayMs = n.getUInt("page_delay", 500);
+  if (config.pageSwitchDelayMs < 100 || config.pageSwitchDelayMs > 5000)
+    config.pageSwitchDelayMs = 500;
+  config.encoderLockMs = n.getUInt("encoder_lock", 2000);
+  if (config.encoderLockMs > 10000) config.encoderLockMs = 2000;
   if (n.getBytesLength("settings2") == sizeof(Settings))
     n.getBytes("settings2", &config.settings, sizeof(Settings));
   auto energy = cJSON_Parse(n.getString("energy1", "").c_str());
@@ -72,6 +92,8 @@ void loadConfiguration() {
   }
   n.end();
   model->settings = config.settings;
+  model->pageSwitchDelayMs = config.pageSwitchDelayMs;
+  model->encoderLockMs = config.encoderLockMs;
   model->energy.enabled = config.energy.enabled;
   model->energy.marginCt = config.energy.marginCt;
   model->energy.vatPercent = config.energy.vatPercent;
@@ -82,16 +104,21 @@ Credentials credentials() {
   Guard g(configMutex);
   return config;
 }
-void saveWifi(const String &s, const String &p) {
+bool saveWifi(const String &s, const String &p) {
   Guard g(configMutex);
-  config.ssid = s;
-  config.password = p;
   Preferences n;
-  n.begin("wifi", false);
-  n.putString("ssid", s);
-  n.putString("pass", p);
-  n.end();
+  if (!n.begin("wifi", false)) return false;
+  // One NVS blob avoids a partially updated SSID/password pair on power loss.
+  auto j = cJSON_CreateObject();
+  cJSON_AddStringToObject(j, "ssid", s.c_str()); cJSON_AddStringToObject(j, "password", p.c_str());
+  char *raw = cJSON_PrintUnformatted(j);
+  bool saved = raw && n.putString("network1", raw) > 0;
+  free(raw); cJSON_Delete(j); n.end();
+  if (!saved) return false;
+  config.ssid = s; config.password = p; config.wifiRevision++;
+  config.wifiApplyAfterUs = esp_timer_get_time() + 1500000;
   config.revision++;
+  return true;
 }
 void saveSpotify(const String &id, const String &token) {
   Guard g(configMutex);
@@ -113,23 +140,73 @@ void rotateToken(const String &t) {
   n.putString("refresh", t);
   n.end();
 }
-static void reply(cJSON *j) {
-  char *p = cJSON_PrintUnformatted(j);
-  if (p) {
-    Serial.println(p);
-    free(p);
-  }
-  cJSON_Delete(j);
-}
-static void ack(bool ok, const char *message = "") {
+static cJSON *ack(bool ok, const char *message = "") {
   auto j = cJSON_CreateObject();
   cJSON_AddBoolToObject(j, "inkos", true);
   cJSON_AddBoolToObject(j, "saved", ok);
-  if (*message)
-    cJSON_AddStringToObject(j, "message", message);
-  reply(j);
+  if (*message) cJSON_AddStringToObject(j, "message", message);
+  return j;
 }
-bool configurationCommand(const char *cmd, cJSON *j) {
+cJSON *configurationCommand(const char *cmd, cJSON *j) {
+  if (!strcmp(cmd,"icloud_get")) {
+    auto v=credentials().icloud;auto out=cJSON_CreateObject();cJSON_AddBoolToObject(out,"inkos",true);
+    cJSON_AddBoolToObject(out,"enabled",v.enabled);cJSON_AddBoolToObject(out,"has_password",v.password.length()>0);
+    cJSON_AddStringToObject(out,"username",v.username.c_str());cJSON_AddStringToObject(out,"calendar_url",v.calendarUrl.c_str());
+    cJSON_AddStringToObject(out,"calendar_name",v.calendarName.c_str());return out;
+  }
+  if (!strcmp(cmd,"icloud_set") || !strcmp(cmd,"icloud_disconnect")) {
+    auto current=credentials().icloud;ICloudConfig v=current;
+    bool remove=!strcmp(cmd,"icloud_disconnect");
+    if(remove)v=ICloudConfig();
+    else {
+      v.enabled=cJSON_IsTrue(cJSON_GetObjectItem(j,"enabled"));
+      v.username=stringAt(j,"username");v.calendarUrl=stringAt(j,"calendar_url");v.calendarName=stringAt(j,"calendar_name");
+      auto field=cJSON_GetObjectItem(j,"password_mode");int mode=cJSON_IsNumber(field)?field->valueint:0;
+      if(mode==1)v.password=stringAt(j,"password");
+      if(mode<0||mode>1||(mode==0&&v.username!=current.username)||v.username.length()>254||
+         v.username.indexOf(':')>=0||v.username.indexOf('\r')>=0||v.username.indexOf('\n')>=0||
+         v.password.length()>128||v.password.indexOf('\r')>=0||v.password.indexOf('\n')>=0||
+         v.calendarName.length()>127||(!v.calendarUrl.isEmpty()&&!validICloudUrl(v.calendarUrl))||
+         (v.enabled&&(v.username.isEmpty()||v.password.length()<8||v.calendarUrl.isEmpty())))
+        return ack(false,"Select an iCloud calendar and use an Apple app-specific password");
+    }
+    auto data=cJSON_CreateObject();cJSON_AddBoolToObject(data,"enabled",v.enabled);
+    cJSON_AddStringToObject(data,"username",v.username.c_str());cJSON_AddStringToObject(data,"password",v.password.c_str());
+    cJSON_AddStringToObject(data,"calendar_url",v.calendarUrl.c_str());cJSON_AddStringToObject(data,"calendar_name",v.calendarName.c_str());
+    char *raw=cJSON_PrintUnformatted(data);bool saved=false;
+    if(raw){Guard g(configMutex);Preferences n;if(n.begin("inkos",false)){saved=n.putString("icloud1",raw)>0;n.end();}
+      if(saved){config.icloud=v;config.revision++;}}
+    if(raw){memset(raw,0,strlen(raw));free(raw);}cJSON_Delete(data);
+    if(saved && (v.enabled!=current.enabled || v.username!=current.username || v.calendarUrl!=current.calendarUrl)) {
+      // Never display events from a previously selected private calendar as the new one.
+      auto cfg=credentials();Guard g(modelMutex);
+      uint32_t revision=model->agenda.revision+1;memset(&model->agenda,0,sizeof model->agenda);model->agenda.revision=revision;
+      model->agenda.configured=cfg.icloud.enabled;
+      for(auto &feed:cfg.feeds)model->agenda.configured|=feed.enabled;
+      model->revision++;invalidate();
+    }
+    return ack(saved,saved?"":"Could not save iCloud configuration");
+  }
+  if (!strcmp(cmd, "wifi_get")) {
+    auto cfg = credentials(); auto out = cJSON_CreateObject();
+    cJSON_AddBoolToObject(out, "inkos", true);
+    cJSON_AddStringToObject(out, "ssid", cfg.ssid.c_str());
+    cJSON_AddBoolToObject(out, "has_password", cfg.password.length() > 0);
+    return out;
+  }
+  if (!strcmp(cmd, "wifi")) {
+    auto cfg = credentials();
+    String ssid = stringAt(j, "ssid"), password = stringAt(j, "password");
+    auto modeField = cJSON_GetObjectItem(j, "password_mode");
+    int mode = cJSON_IsNumber(modeField) ? modeField->valueint : 1;
+    if (mode == 0) password = cfg.password;
+    if (mode == 2) password = "";
+    if (ssid.isEmpty() || ssid.length() > 32 || mode < 0 || mode > 2 ||
+        (mode == 1 && (password.length() < 8 || password.length() > 63)) ||
+        (mode == 0 && (ssid != cfg.ssid || password.isEmpty())))
+      return ack(false, "Use a 1-32 byte SSID and 8-63 byte password, or select an open network");
+    return ack(saveWifi(ssid, password), "Wi-Fi saved; reconnect using the new IP if needed");
+  }
   if (!strcmp(cmd, "energy_set")) {
     auto v = credentials().energy;
     auto s = cJSON_GetObjectItem(j, "energy");
@@ -143,8 +220,7 @@ bool configurationCommand(const char *cmd, cJSON *j) {
         !isfinite(vat->valuedouble) || vat->valuedouble < 0 || vat->valuedouble > 100 ||
         !cJSON_IsNumber(transmission) || !isfinite(transmission->valuedouble) ||
         transmission->valuedouble < 0 || transmission->valuedouble > 1000) {
-      ack(false, "Invalid provider, VAT, margin or transmission");
-      return true;
+      return ack(false, "Invalid provider, VAT, margin or transmission");
     }
     v.enabled = cJSON_IsTrue(cJSON_GetObjectItem(s, "enabled"));
     v.marginCt = margin->valuedouble;
@@ -167,8 +243,7 @@ bool configurationCommand(const char *cmd, cJSON *j) {
         v.endpoint.length() > 512 || v.endpoint.indexOf('\r') >= 0 ||
         v.endpoint.indexOf('\n') >= 0 || badHeader || v.apiKey.length() > 256 ||
         v.apiKey.indexOf('\r') >= 0 || v.apiKey.indexOf('\n') >= 0 || keyMode < 0 || keyMode > 2) {
-      ack(false, "Use an HTTPS endpoint and a valid API header/value");
-      return true;
+      return ack(false, "Use an HTTPS endpoint and a valid API header/value");
     }
     auto out = cJSON_CreateObject();
     cJSON_AddBoolToObject(out, "enabled", v.enabled);
@@ -216,8 +291,7 @@ bool configurationCommand(const char *cmd, cJSON *j) {
     }
     if (saved)
       invalidate();
-    ack(saved, saved ? "" : "Could not save energy settings");
-    return true;
+    return ack(saved, saved ? "" : "Could not save energy settings");
   }
   if (!strcmp(cmd, "spotify_disconnect")) {
     {
@@ -243,8 +317,7 @@ bool configurationCommand(const char *cmd, cJSON *j) {
       model->music.artRevision++;
     }
     invalidate();
-    ack(true);
-    return true;
+    return ack(true);
   }
   if (!strcmp(cmd, "settings_get")) {
     auto cfg = credentials();
@@ -268,6 +341,8 @@ bool configurationCommand(const char *cmd, cJSON *j) {
     cJSON_AddNumberToObject(s, "longitude", v.longitude);
     cJSON_AddNumberToObject(s, "weather_source", v.weatherSource);
     cJSON_AddBoolToObject(s, "animations", v.animations);
+    cJSON_AddNumberToObject(s, "page_switch_delay_ms", cfg.pageSwitchDelayMs);
+    cJSON_AddNumberToObject(s, "encoder_lock_ms", cfg.encoderLockMs);
     cJSON_AddStringToObject(s, "met_contact", v.metContact);
     auto worlds = cJSON_AddArrayToObject(s, "worlds");
     for (auto &w : v.worlds) {
@@ -285,15 +360,31 @@ bool configurationCommand(const char *cmd, cJSON *j) {
       cJSON_AddBoolToObject(row, "enabled", f.enabled);
       cJSON_AddItemToArray(feeds, row);
     }
-    reply(out);
-    return true;
+    return out;
   }
   if (!strcmp(cmd, "settings_set")) {
-    Settings v = credentials().settings;
+    auto current = credentials();
+    Settings v = current.settings;
+    uint32_t pageDelay = current.pageSwitchDelayMs, encoderLock = current.encoderLockMs;
     auto s = cJSON_GetObjectItem(j, "settings");
     if (!cJSON_IsObject(s)) {
-      ack(false, "Missing settings");
-      return true;
+      return ack(false, "Missing settings");
+    }
+    auto delayField = cJSON_GetObjectItem(s, "page_switch_delay_ms");
+    if (delayField) {
+      if (!cJSON_IsNumber(delayField) || !isfinite(delayField->valuedouble) ||
+          delayField->valuedouble < 100 || delayField->valuedouble > 5000 ||
+          delayField->valuedouble != delayField->valueint)
+        return ack(false, "Page switch delay must be 100-5000 integer milliseconds");
+      pageDelay = delayField->valueint;
+    }
+    auto lockField = cJSON_GetObjectItem(s, "encoder_lock_ms");
+    if (lockField) {
+      if (!cJSON_IsNumber(lockField) || !isfinite(lockField->valuedouble) ||
+          lockField->valuedouble < 0 || lockField->valuedouble > 10000 ||
+          lockField->valuedouble != lockField->valueint)
+        return ack(false, "Encoder lock must be 0-10000 integer milliseconds");
+      encoderLock = lockField->valueint;
     }
     strlcpy(v.location, stringAt(s, "location"), sizeof v.location);
     strlcpy(v.localZone, stringAt(s, "zone"), sizeof v.localZone);
@@ -302,8 +393,7 @@ bool configurationCommand(const char *cmd, cJSON *j) {
     if (!*v.location || !findZone(v.localZone) || !cJSON_IsNumber(lat) || !cJSON_IsNumber(lon) ||
         fabs(lat->valuedouble) > 90 || fabs(lon->valuedouble) > 180 || !cJSON_IsNumber(source) ||
         source->valueint < 0 || source->valueint > 1) {
-      ack(false, "Invalid place, coordinates, time zone or source");
-      return true;
+      return ack(false, "Invalid place, coordinates, time zone or source");
     }
     v.latitude = lat->valuedouble;
     v.longitude = lon->valuedouble;
@@ -312,41 +402,54 @@ bool configurationCommand(const char *cmd, cJSON *j) {
     strlcpy(v.metContact, stringAt(s, "met_contact"), sizeof v.metContact);
     auto worlds = cJSON_GetObjectItem(s, "worlds");
     if (cJSON_GetArraySize(worlds) != 2) {
-      ack(false, "Two world clocks are required");
-      return true;
+      return ack(false, "Two world clocks are required");
     }
     for (int i = 0; i < 2; i++) {
       auto w = cJSON_GetArrayItem(worlds, i);
       const char *zone = stringAt(w, "zone"), *label = stringAt(w, "label");
       if (!*label || !findZone(zone)) {
-        ack(false, "Unsupported clock time zone");
-        return true;
+        return ack(false, "Unsupported clock time zone");
       }
       strlcpy(v.worlds[i].zone, zone, sizeof v.worlds[i].zone);
       strlcpy(v.worlds[i].label, label, sizeof v.worlds[i].label);
     }
     if (strchr(v.metContact, '\r') || strchr(v.metContact, '\n')) {
-      ack(false, "Invalid contact");
-      return true;
+      return ack(false, "Invalid contact");
     }
     {
       Guard g(configMutex);
       v.revision = config.settings.revision + 1;
       if (!writeSettings(v)) {
-        ack(false, "Configuration storage is full");
-        return true;
+        return ack(false, "Configuration storage is full");
       }
+      if (pageDelay != config.pageSwitchDelayMs) {
+        Preferences n;
+        if (!n.begin("inkos", false)) return ack(false, "Could not save page switch delay");
+        bool saved = n.putUInt("page_delay", pageDelay) == sizeof(uint32_t);
+        n.end();
+        if (!saved) return ack(false, "Could not save page switch delay");
+      }
+      if (encoderLock != config.encoderLockMs) {
+        Preferences n;
+        if (!n.begin("inkos", false)) return ack(false, "Could not save encoder lock");
+        bool saved = n.putUInt("encoder_lock", encoderLock) == sizeof(uint32_t);
+        n.end();
+        if (!saved) return ack(false, "Could not save encoder lock");
+      }
+      config.encoderLockMs = encoderLock;
       config.settings = v;
+      config.pageSwitchDelayMs = pageDelay;
       config.revision++;
     }
     {
       Guard g(modelMutex);
       model->settings = v;
+      model->pageSwitchDelayMs = pageDelay;
+      model->encoderLockMs = encoderLock;
       model->revision++;
     }
     invalidate();
-    ack(true);
-    return true;
+    return ack(true);
   }
   if (!strcmp(cmd, "feed_set")) {
     auto index = cJSON_GetObjectItem(j, "index");
@@ -357,8 +460,7 @@ bool configurationCommand(const char *cmd, cJSON *j) {
     bool enabled = cJSON_IsTrue(cJSON_GetObjectItem(j, "enabled"));
     if (i < 0 || i >= 3 || url.length() > 1500 || (url.length() && !url.startsWith("https://")) ||
         (enabled && url.isEmpty()) || url.indexOf('\r') >= 0 || url.indexOf('\n') >= 0) {
-      ack(false, "Use an HTTPS or webcal ICS subscription URL");
-      return true;
+      return ack(false, "Use an HTTPS or webcal ICS subscription URL");
     }
     auto data = cJSON_CreateObject();
     cJSON_AddStringToObject(data, "url", url.c_str());
@@ -387,9 +489,8 @@ bool configurationCommand(const char *cmd, cJSON *j) {
     if (raw)
       free(raw);
     cJSON_Delete(data);
-    ack(saved, saved ? "" : "Could not save feed");
-    return true;
+    return ack(saved, saved ? "" : "Could not save feed");
   }
-  return false;
+  return nullptr;
 }
 } // namespace ink

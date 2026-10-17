@@ -1,0 +1,20 @@
+{
+  "version": "7.4.47",
+  "mask_style": "light",
+  "inset_svg_units": 0.5,
+  "sha256": {
+    "weather-sunny": "3a6c5084d05d113cf37854749c61a262a9a848fb155e73a559403fb605942ae4",
+    "weather-night": "8622a247f8bc89b88be6c0ec1c2a5b4d6451f61a7b723aed7234db2e9fdb7755",
+    "weather-partly-cloudy": "6f310f9870521da60dbd900194aef4bfc1594319767bad931db4cc76cc547d0f",
+    "weather-night-partly-cloudy": "2b9d9951d4f21b4a60d4eab4312e12788f85d3cd62070f177cd492f64cc26dd4",
+    "weather-cloudy": "8d92af3e57d366caea16353bbba8006218beacb4adfc0da435dc4da4bbc6d203",
+    "weather-fog": "860b33e30ce46f9fe0d8ad9e48ad118f6db29ef34d23f3cb61497d1f3b2fe5db",
+    "weather-rainy": "c488b523b061193bab4a08aa599da7340f02674df337fc06052399d70c3e3a8b",
+    "weather-pouring": "3d92dbc206b8e272b54a9d0b0ab3e8e9ad643f9ca8ab63d6330a5329d29c341e",
+    "weather-snowy": "f423e5bddc6aea1c94524f4ac010e732a9d6e351dff72954a951d84015486db5",
+    "weather-snowy-heavy": "4484ee1538f179bbd4b218ffc74f01ae4097f676e36f09ca309a86ae5f08385e",
+    "weather-snowy-rainy": "5894f3ade493b6221f63616814a2d5ade8df543f961c5ace1f7ce2eda6599643",
+    "weather-lightning-rainy": "3f10f42bfa032290a466cf9ebd2a04e65a3560519c7528352bd25bc6827ee48e",
+    "weather-hail": "24a3a7c23dfe9c94f1b0952736dc65e18f435cdf18b9b7cf3a9811fdb4c6d5e1"
+  }
+}

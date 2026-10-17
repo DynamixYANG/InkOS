@@ -1,0 +1,32 @@
+{
+  "version": "0.7.0",
+  "healthy": true,
+  "selftest": 160,
+  "settings_feeds_energy_preserved": true,
+  "font_sha256_unchanged": true,
+  "private_icloud_credentials_pending": false,
+  "invalid_icloud_config_rejected": true,
+  "encoder_decoder_fixture_passed": true,
+  "physical_encoder_user_confirmation_pending": false,
+  "battery_voltage": 0,
+  "battery_percent": -1,
+  "wifi_rssi": -28,
+  "firmware_sha256": "6ba83526ac877de2b68139a2a49b239adb4d47d67aaa9f20d7451d4fa15f4b2c",
+  "slot": "ota_0",
+  "ota_transport": "USB app-only OTA into inactive slot; existing paired IP credentials retained",
+  "synthetic_pages_checked": 9,
+  "studio_checks": 12,
+  "python_tests": 21,
+  "physical_encoder_user_confirmed": true,
+  "private_icloud_configuration": "Deferred at user request",
+  "battery_power_source_user_confirmed": "USB-C only, no battery connected",
+  "unknown_battery_icon": "Battery with slash; no percentage",
+  "weather_icon_style": "InkOS light derivative of MDI 7.4.47; native 40/64 px",
+  "forecast_title": "WEATHER / location",
+  "final_page": 2,
+  "limitations": [
+    "Live iCloud account setup deferred at user request",
+    "Battery capacity estimation has not been physically calibrated",
+    "No new long-term optical contrast/ghosting test"
+  ]
+}

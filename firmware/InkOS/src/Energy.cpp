@@ -2,6 +2,7 @@
 #include "Services.h"
 #include "Zones.h"
 #include <LittleFS.h>
+#include "Storage.h"
 #include <algorithm>
 #include <esp_heap_caps.h>
 #include <new>
@@ -165,7 +166,7 @@ static uint32_t sourceKey(const EnergyConfig &e) {
   return hash(e.endpoint.c_str(), e.endpoint.length()) ^ uint32_t(e.provider);
 }
 static bool storage() {
-  return LittleFS.begin(false, "/inkstore", 5, "storage");
+  return ensureStorage();
 }
 struct CacheHeader {
   uint32_t magic, size, checksum;

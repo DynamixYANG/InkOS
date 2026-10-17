@@ -2,7 +2,7 @@
 #include "Domain.h"
 #include <SPI.h>
 namespace ink {
-enum class RefreshMode { Clock, Music, Animation };
+enum class RefreshMode { Clock, Music, Animation, Navigation };
 class Panel {
   SPIClass spi{HSPI};
   bool ok = false, powered = false;
@@ -19,6 +19,7 @@ class Panel {
   bool powerOff();
   void fullMode();
   void partialMode();
+  void navigationMode();
   void writeFull(const uint8_t *);
   void solid(uint8_t);
 

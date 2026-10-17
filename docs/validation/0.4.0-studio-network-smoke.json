@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "usb_ip_settings_equal": true,
+  "viewmodel_roundtrip": true,
+  "navigation": true,
+  "pairing_usb_only": true,
+  "wrong_key_rejected": true,
+  "replay_rejected": true,
+  "response_challenge_bound": true,
+  "invalid_wifi_rejected": true,
+  "wifi_keep_roundtrip": true,
+  "credentials_logged": false,
+  "endpoint_edit_disconnects": true
+}

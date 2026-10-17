@@ -8,7 +8,7 @@ InkOS 是 FreeRTOS 上的 ESP32 应用，不是 Linux。主控承担时间换算
 
 ```mermaid
 flowchart LR
-  P[Weather / Spotify / LRCLIB / ICS / FI prices] --> N[Network task · core 0]
+  P[Weather / Spotify / Lyrics / ICS / FI prices] --> N[Network task · core 0]
   T[SNTP + local astronomy] --> M[Typed Model / PSRAM]
   N --> M
   U[Buttons / USB configuration / local HTTP] --> M
@@ -34,6 +34,8 @@ Model、绘图快照和大缓冲区位于 PSRAM；内部 RAM 仍承担任务栈�
 
 重绘队列容量为 1：快速到来的更新合并为“按最新状态重绘”，不会积累过时帧。Panel 仍有实际忙状态；动画目标频率不等于可保证的物理刷新频率。
 
+0.6.1 的 PageNavigation 只由 display 任务持有，区分已提交整页、当前选择和已显示标题。control 任务递增 navigationRevision 并记录单调请求时间，局刷期间仍能采集按键；display 完成标题后重新读取最新请求，待标题可见且停按时间达到配置值，才绘制／提交整页。预览等待期间暂停正文更新，渲染后再次核对请求序号，丢弃过时目标。物理刷新开始后不可中断；期间新请求留到下一轮处理。
+
 ## 模块地图
 
 | 模块 | 责任 |
@@ -50,8 +52,14 @@ Model、绘图快照和大缓冲区位于 PSRAM；内部 RAM 仍承担任务栈�
 | Pages / WeekPage / AstronomyPages / EnergyPage | 用快照绘制页面，不写设置、不取网络数据 |
 | Layout | 共用页边距、标题线、底栏、主页栏目边界 |
 | Panel | 独占 SPI，工厂波形，全刷／局刷，old/new frame 和清理预算 |
+| PageNavigation | 无硬件依赖的标题预览与停按计时状态；合并最新选页请求 |
+| Hardware / StatusIcons | 编码器 IRQ／完整周期解码、ADC 采样和电量估计；统一电池与 Wi-Fi 图示 |
+| CalDav | Apple 地址验证、有界 XML 与 calendar-query REPORT；复用 ICS 解析，不绘图 |
+| WeatherIcons | WMO／日夜码到 MDI 原生位图映射；绘制与可选动画，不联网 |
 | Runtime | 任务装配、调度、按键、USB 和本地调试端点 |
 | desktop/InkOS.Studio | 独立 View、ViewModel、DTO、USB client、临时 Spotify PKCE callback |
+
+Studio 的 ICloudCalendarClient 负责一次性 PROPFIND 发现与列表；ICloudView/主 ViewModel 只处理用户选择与通过 DeviceClient 写入。设备 NVS 的 icloud1 保存账户与单个集合，正常读取只返回 has_password。运行时仍由 network 任务串行执行 REPORT，不增加常驻电脑服务。编码器 ISR 仅积累有界步数，control 任务消费后调用统一导航，不在中断中绘图或请求网络。
 
 ## 一次数据更新如何到达屏幕
 
@@ -85,6 +93,27 @@ Settings 原始字节保存方式对结构体布局敏感。增加字段前必�
 
 ## 桌面程序边界
 
-MainWindow 只承载侧栏与页面选择；Views 是五个独立设置区。MainViewModel 持有编辑模型、校验和命令状态；DeviceClient 串行发送请求并匹配响应。SpotifyAuthorization 独占临时浏览器授权状态。
+MainWindow 只承载侧栏与页面选择；Views 是六个独立设置区。MainViewModel 持有编辑模型、校验和命令状态；DeviceClient 串行发送请求并匹配响应，委托 UsbTransport 或 NetworkTransport。固件 executeCommand 共用命令分发；RemoteConfiguration 独立处理 USB 配对和 AES-GCM 网络信封。SpotifyAuthorization 独占临时浏览器授权状态。
 
-Studio 不代设备抓天气、渲染屏幕或定时抓日历。关闭上位机不影响已配置设备的数据更新。对外 HTTP 是 ESP32 自己托管的调试服务，不是上位机 server。
+Studio 不代设备抓天气、渲染屏幕或定时抓日历。关闭上位机不影响已配置设备的数据更新。对外 HTTP 是 ESP32 自己托管的调试与加密配置服务，不是上位机 server。
+
+网络配置和凭据边界见 [NETWORK](NETWORK.md)。Wi-Fi 新配置独立保存在 `wifi/network1`，不改变 Settings 二进制结构和分区表。
+
+
+0.4.3 的 `LyricMatching` 负责纯文本和版本匹配，`LyricHan` 提供 OpenCC 字符映射；`LyricsResolver` 注入 transport 并串行查询 LRCLIB／网易云；`LyricsService` 适配 ESP32 HTTPS、退避状态与 USB 固定曲目测试。Spotify 先发布播放快照，再执行可超时的歌词查询。歌词服务不写账号、日历或显示配置。
+
+## OTA 与共享资源
+
+`Ota` 封装 ESP-IDF 原生 A/B 写入、健康确认与回退；`Runtime` 提供任务心跳。`CjkAssets` 负责不可变字库的校验、内部分区映射与分块解压缓存，Canvas 仅依赖字形查询接口。`Storage` 独占 U5 设备注册、身份检查和外部 LittleFS 挂载，日历和电价只依赖存储接口。0.6 内部应用槽各 5.9375 MiB，字体在内部 `0xC00000`，文件系统全部在外部 4 MiB。Studio 和 Python CLI 复用已配对加密通道。普通 OTA 不修改共享字库、NVS 或 LittleFS；边界与分区见 [OTA](OTA.md)。
+
+### Input isolation (0.7.1)
+
+A GPIO ISR captures both GPIO41/42 levels in one `GPIO_IN1_REG` snapshot and accumulates validated full-cycle detents. The small `input` task drains them independently of the blocking `control` HTTP/USB task. Encoder state, pending movement and the lock deadline share one ISR-safe critical section. Target publication and the final full-refresh acceptance both hold `modelMutex`; an encoder-only gate is rechecked there to close the capture/delivery race. Locking clears pending movement and partial cycle state. KEY3 and software navigation bypass the encoder-only gate.
+
+`PageNavigation` coalesces fast title requests and tracks only the newest target. The physical title preview still completes before the configurable quiet period begins. At final full-refresh acceptance the encoder gate is armed for the configured interval. Display buffers and panel I/O remain exclusively owned by the display task.
+
+### Navigation-first rendering (0.7.2)
+
+A validated encoder detent notifies the input task directly from the ISR; the task otherwise sleeps up to 10 ms to sample buttons. The display event queue wakes immediately for navigation. A small `DisplayState` and `RenderToken` are checked before any full Model snapshot. Titles bypass background work, and only the latest target is retained while hardware is busy. Body rendering is performed once during the quiet/title-visible interval, cached by token and invalidated by new data or input. No modelMutex is held across panel I/O.
+
+`BackgroundSchedule` batches publishers for 40 ms (150 ms cap). Title/full-page acceptance still rechecks the navigation revision before starting panel work. The encoder gate and original factory waveform remain unchanged. Diagnostics separate dispatch latency, physical title completion, final acceptance, and full snapshot count.

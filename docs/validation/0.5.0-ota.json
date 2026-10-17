@@ -1,0 +1,85 @@
+{
+  "checks": [
+    {
+      "name": "wrong board",
+      "passed": true
+    },
+    {
+      "name": "wrong layout",
+      "passed": true
+    },
+    {
+      "name": "wrong assets",
+      "passed": true
+    },
+    {
+      "name": "oversize image",
+      "passed": true
+    },
+    {
+      "name": "invalid header",
+      "passed": true
+    },
+    {
+      "name": "unauthorized request rejected",
+      "passed": true
+    },
+    {
+      "name": "wrong chunk offset",
+      "passed": true
+    },
+    {
+      "name": "incomplete image finish",
+      "passed": true
+    },
+    {
+      "name": "duplicate chunk idempotence",
+      "passed": true
+    },
+    {
+      "name": "final SHA mismatch",
+      "passed": true
+    },
+    {
+      "name": "bad hash leaves current boot intact",
+      "passed": true
+    },
+    {
+      "name": "interrupted partial upload waiting for timeout",
+      "started": true
+    },
+    {
+      "name": "interrupted upload timeout",
+      "passed": true
+    },
+    {
+      "name": "IP OTA A to B and automatic reboot",
+      "passed": true,
+      "slot": "ota_1",
+      "healthy": true
+    },
+    {
+      "name": "final Source Han IP OTA A to B",
+      "passed": true,
+      "healthy": true
+    },
+    {
+      "name": "observed pending verification",
+      "slot": "ota_0",
+      "state": 1,
+      "healthy": false
+    },
+    {
+      "name": "native bootloader rollback after unconfirmed restart",
+      "passed": true
+    },
+    {
+      "name": "final Source Han IP OTA B to A",
+      "passed": true,
+      "healthy": true
+    }
+  ],
+  "complete": true,
+  "final_font_sha256": "ded63f2809bbadd5887b50fda6854d39f1cca884060063fa80b928608e5835e2",
+  "final_slot": "ota_0"
+}

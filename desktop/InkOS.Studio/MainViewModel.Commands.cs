@@ -5,7 +5,7 @@ public sealed partial class MainViewModel {
  public bool IsBusy=>busy;
  public string ClientId{get;set;}="";
  public string RedirectUri=>SpotifyAuthorization.RedirectUri;
- public string ConnectionLabel=>Connected?$"CONNECTED / {SelectedPort}":"USB / DISCONNECTED";
+ public string ConnectionLabel=>Connected?$"CONNECTED / {(UseNetwork?"IP":SelectedPort)}":$"{(UseNetwork?"IP":"USB")} / DISCONNECTED";
  public StudioCommand ConnectCommand{get;private set;}=null!;
  public StudioCommand RefreshPortsCommand{get;private set;}=null!;
  public StudioCommand SaveCommand{get;private set;}=null!;
@@ -24,7 +24,10 @@ public sealed partial class MainViewModel {
   CancelAuthorizationCommand=new(_=>{authorization?.Cancel();return Task.CompletedTask;},()=>busy&&authorization!=null);
   DisconnectSpotifyCommand=new(_=>RunAsync(DisconnectSpotifyAsync),()=>!busy&&Connected);
   OpenLinkCommand=new(p=>RunAsync(()=>{var url=(string)p!;if(!Uri.TryCreate(url,UriKind.Absolute,out var uri)||uri.Scheme!="https")throw new InvalidOperationException("Invalid guide URL.");Process.Start(new ProcessStartInfo(url){UseShellExecute=true});return Task.CompletedTask;}),()=>!busy);
-  commands=[ConnectCommand,RefreshPortsCommand,SaveCommand,NavigateCommand,AuthorizeCommand,CancelAuthorizationCommand,DisconnectSpotifyCommand,OpenLinkCommand];
+  InitializeNetworkCommands();
+  InitializeFirmwareCommands();
+  InitializeICloudCommands();
+  commands=[DiscoverICloudCommand,SaveICloudCommand,DisconnectICloudCommand,UpgradeFirmwareCommand,SaveWifiCommand,PairNetworkCommand,DisableNetworkCommand,ConnectCommand,RefreshPortsCommand,SaveCommand,NavigateCommand,AuthorizeCommand,CancelAuthorizationCommand,DisconnectSpotifyCommand,OpenLinkCommand];
  }
  private async Task RunAsync(Func<Task> work){
   if(busy)return;busy=true;RefreshCommands();
@@ -33,5 +36,5 @@ public sealed partial class MainViewModel {
   catch(Exception ex){Status=ex is InvalidOperationException or TimeoutException?ex.Message:"The operation failed. Check USB, the network and app settings.";}
   finally{authorization?.Dispose();authorization=null;busy=false;RefreshCommands();}
  }
- private void RefreshCommands(){Notify(nameof(IsBusy));Notify(nameof(Connected));Notify(nameof(ConnectionLabel));foreach(var c in commands)c.Refresh();}
+ private void RefreshCommands(){Notify(nameof(IsBusy));Notify(nameof(CanChooseFirmware));Notify(nameof(Connected));Notify(nameof(ConnectionLabel));foreach(var c in commands)c.Refresh();}
 }

@@ -1,6 +1,6 @@
 # InkOS 文档导航
 
-文档对应固件 **0.3.1**、Studio **0.3.0**。功能状态以当前源码和 [验证记录](VALIDATION.md) 为准；规划不代表已经实现。
+文档对应固件 **0.7.0**、Studio **0.7.0**。功能状态以当前源码和 [验证记录](VALIDATION.md) 为准；规划不代表已经实现。
 
 | 文档 | 解决的问题 |
 |---|---|
@@ -21,3 +21,15 @@
 从零使用建议顺序：**HARDWARE → BUILD → CONFIGURATION → SPOTIFY**。修改代码建议先读 **ARCHITECTURE → DEVELOPMENT → DISPLAY → VALIDATION**。
 
 `images/screen/` 是设备提供的原始 800×480 单色画面转换得到的 PNG。`images/studio/` 是未登录、未配置私人数据的应用示例；不是用户账户截图。`validation/` 只保存可公开的摘要，不包含原始 NVS、串口设置响应或用户订阅。
+
+- [Wi-Fi 与加密 IP 配置](NETWORK.md)：首次配网、USB 配对、另一台电脑设置、协议和重连。
+
+- [月历与周时间网格](CALENDAR.md)：ISO 周序号、事件块、全天横条、当前时间线和预览。
+
+- [OTA、A/B 启动、外部字库和 USB 迁移](OTA.md)
+
+- [U5 外部 Flash 手册核对、实板引脚与速率测试](EXTERNAL-FLASH.md)
+
+- [Flash 分区饼图、实际占用与容量余量](STORAGE.md)
+
+- [iCloud 私有日历选择与设备直连](ICLOUD.md)

@@ -1,6 +1,7 @@
-# Keep Tesserae's NVS at 0x9000; factory app starts at 0x20000.
+# InkOS external-FS A/B v2. U5 extstore is registered at runtime.
 # Name,Type,SubType,Offset,Size,Flags
 nvs,data,nvs,0x9000,0x6000,
 otadata,data,ota,0x10000,0x2000,
-factory,app,factory,0x20000,0xC00000,
-storage,data,spiffs,0xC20000,0x3E0000,
+ota_0,app,ota_0,0x20000,0x5F0000,
+ota_1,app,ota_1,0x610000,0x5F0000,
+fonts,data,0x40,0xC00000,0x400000,

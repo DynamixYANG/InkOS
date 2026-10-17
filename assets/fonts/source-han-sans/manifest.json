@@ -1,0 +1,49 @@
+{
+  "source": "https://github.com/adobe-fonts/source-han-sans",
+  "file": "SourceHanSansSC-Light.otf",
+  "sha256": "b6dfc945aae0daf9b15019f59c2f7b18d17da3b92f00c3ec32fb5f0333696d9c",
+  "license": "OFL-1.1",
+  "family": "Source Han Sans SC Light",
+  "sizes": {
+    "14": {
+      "glyphs": 28430,
+      "bitmap_bytes": 704342
+    },
+    "18": {
+      "glyphs": 28430,
+      "bitmap_bytes": 1150072
+    },
+    "24": {
+      "glyphs": 28430,
+      "bitmap_bytes": 2009844
+    },
+    "28": {
+      "glyphs": 28430,
+      "bitmap_bytes": 2724398
+    }
+  },
+  "pillow": "12.3.0",
+  "freetype": "2.14.3",
+  "raster": "FreeType native-size monochrome, no antialiasing or runtime scaling",
+  "coverage": "BMP CJK unified/Extension A/compatibility ideographs, Chinese punctuation, kana and Bopomofo; no emoji or supplementary-plane ideographs",
+  "archive": {
+    "glyphs_per_size": 28430,
+    "sizes": [
+      14,
+      18,
+      24,
+      28
+    ],
+    "asset_bytes": 4185866,
+    "record_bytes": 8,
+    "internal_bytes": 4185866,
+    "external_bytes": 0,
+    "raw_bytes": 7555344,
+    "raw_sha256": "c859ec113dcd98d7976cc07e419f3957138bcf4a56b425975cc83dfc9d89d046",
+    "sha256": "ded63f2809bbadd5887b50fda6854d39f1cca884060063fa80b928608e5835e2",
+    "codec": "raw-deflate-262144-byte-blocks",
+    "zlib_version": "1.3.2",
+    "zlib_runtime": "1.3.2",
+    "all_blocks_lossless_verified": true
+  }
+}

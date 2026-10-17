@@ -1,0 +1,106 @@
+{
+  "version": "0.7.3",
+  "experimental": true,
+  "health": {
+    "version": "0.7.3",
+    "healthy": true,
+    "startup_checks": 188,
+    "settings_feeds_energy_preserved": true,
+    "font_archive_preserved": true,
+    "default_encoder_lock_ms": 2000,
+    "firmware_sha256": "bf37cd1b453b34afa652ca2dc86bfcb3c7073b2c297e4bb6941fde056b073b50",
+    "slot": "ota_0"
+  },
+  "timing": {
+    "version": "0.7.3",
+    "experiment": "title-only short differential waveform",
+    "cases": [
+      {
+        "page": 6,
+        "title_present_ms": 281,
+        "selection_to_visible_ms": 297,
+        "selection_to_full_start_ms": 515,
+        "full_ms": 4172,
+        "window": [
+          8,
+          13,
+          176,
+          17
+        ]
+      },
+      {
+        "page": 0,
+        "title_present_ms": 281,
+        "selection_to_visible_ms": 313,
+        "selection_to_full_start_ms": 516,
+        "full_ms": 4172,
+        "window": [
+          8,
+          13,
+          176,
+          17
+        ]
+      },
+      {
+        "page": 2,
+        "title_present_ms": 281,
+        "selection_to_visible_ms": 297,
+        "selection_to_full_start_ms": 515,
+        "full_ms": 4172,
+        "window": [
+          8,
+          13,
+          160,
+          17
+        ]
+      },
+      {
+        "page": 0,
+        "title_present_ms": 281,
+        "selection_to_visible_ms": 297,
+        "selection_to_full_start_ms": 516,
+        "full_ms": 4172,
+        "window": [
+          8,
+          13,
+          160,
+          17
+        ]
+      }
+    ],
+    "median_title_present_ms": 281.0,
+    "median_selection_to_visible_ms": 297.0,
+    "median_selection_to_full_start_ms": 515.5,
+    "factory_full_retained": true,
+    "controller_windows_title_only": true,
+    "optical_body_quality_pending": true,
+    "settings_feeds_energy_preserved": true,
+    "visual_acceptance_pending": false,
+    "final_page": 0,
+    "optical_acceptance": false
+  },
+  "burst": {
+    "requests": 28,
+    "preview_count": 9,
+    "preview_durations_ms": [
+      281,
+      281,
+      281,
+      280,
+      280,
+      281,
+      281,
+      281,
+      281
+    ],
+    "only_final_page_committed": true,
+    "all_windows_title_only": true,
+    "settings_preserved": true,
+    "final_page": 0
+  },
+  "visual_feedback_pending": false,
+  "known_good_fallback": "InkOS-OTA-0.7.2.zip",
+  "optical_accepted": false,
+  "user_feedback": "Previous title characters were not erased; user requested a 0.5-second trial.",
+  "body_quality_not_reported": true
+}

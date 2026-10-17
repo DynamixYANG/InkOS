@@ -1,0 +1,68 @@
+{
+  "firmware": "0.4.3",
+  "date": "2026-10-17",
+  "application_sha256": "3f793e12f9bc9463e5b3bf1310c065c4242b45c0d140d4e6b8a537e96f5d07a3",
+  "application_size_bytes": 10241152,
+  "compiler_program_storage_bytes": 10241006,
+  "compiler_global_variable_bytes": 48884,
+  "startup_selftest": {
+    "passed": 119,
+    "total": 119,
+    "version": "0.4.3"
+  },
+  "new_resolver_checks": 29,
+  "live_provider_checks": [
+    {
+      "fixture": 0,
+      "source": "lrclib_search",
+      "timed": true,
+      "lines": 49,
+      "requests": 1,
+      "candidates": 20,
+      "match_score": 150,
+      "lrclib_http": 200,
+      "netease_http": 0,
+      "deferred": false,
+      "passed": true
+    },
+    {
+      "fixture": 1,
+      "source": "netease",
+      "timed": true,
+      "lines": 72,
+      "requests": 2,
+      "candidates": 10,
+      "match_score": 160,
+      "lrclib_http": 0,
+      "netease_http": 200,
+      "deferred": false,
+      "passed": true
+    },
+    {
+      "fixture": 2,
+      "source": "netease",
+      "timed": true,
+      "lines": 72,
+      "requests": 3,
+      "candidates": 10,
+      "match_score": 160,
+      "lrclib_http": 503,
+      "netease_http": 200,
+      "deferred": true,
+      "passed": true
+    }
+  ],
+  "configuration_fingerprint_unchanged": true,
+  "runtime": {
+    "version": "0.4.3",
+    "page": 0,
+    "wifi": true,
+    "spotify": true,
+    "calendar_configured": true,
+    "calendar_events": 5,
+    "calendar_stale": false
+  },
+  "original_fonts_and_factory_refresh_waveforms_unchanged": true,
+  "long_term_physical_contrast_retested": false,
+  "coverage_limits": "Fixed live probes validate LRCLIB search, NetEase and automatic fallback; no full Chinese-catalog coverage benchmark or user-library alignment benchmark."
+}

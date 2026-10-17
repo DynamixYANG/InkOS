@@ -1,0 +1,10 @@
+{
+  "version": "0.7.1",
+  "healthy": true,
+  "startup_checks": 170,
+  "settings_feeds_energy_preserved": true,
+  "font_archive_preserved": true,
+  "default_encoder_lock_ms": 2000,
+  "firmware_sha256": "7a7007c067e2a4104ce10718da42f5f367942cf2f0b8985e05689c57d71e2e1e",
+  "slot": "ota_0"
+}

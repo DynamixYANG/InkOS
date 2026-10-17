@@ -1,5 +1,7 @@
 """Portable Arduino build. All generated files stay in ignored directories."""
 import argparse
+import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -17,6 +19,13 @@ def main():
     args = parser.parse_args()
     if not args.cli:
         parser.error('Install Arduino CLI or set ARDUINO_CLI to its executable.')
+    archive = ROOT / 'out/assets/fonts.bin'
+    manifest = ROOT / 'out/assets/manifest.json'
+    if not archive.is_file() or not manifest.is_file():
+        parser.error('Run tools/generate_cjk_fonts.py before building the A/B firmware.')
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    if json.loads(manifest.read_text())['sha256'] != digest or digest not in (ROOT / 'firmware/InkOS/src/CjkAssetsData.h').read_text():
+        parser.error('Font archive/header identity mismatch; regenerate fonts before building.')
     args.output.mkdir(parents=True, exist_ok=True)
     # GCC embeds __FILE__ in assertions. Publish reproducible virtual paths,
     # including libraries/toolchains installed below the developer's home.
@@ -26,7 +35,7 @@ def main():
         mappings[str(path)] = target
     flags = ' '.join('"-ffile-prefix-map=' + source.replace('\\', '\\\\') + '=' + target + '"'
                      for source, target in mappings.items())
-    cmd = [args.cli, 'compile', '--fqbn', FQBN, '--build-property', 'upload.maximum_size=12582912',
+    cmd = [args.cli, 'compile', '--fqbn', FQBN, '--build-property', 'upload.maximum_size=6225920',
            '--build-property', 'compiler.cpp.extra_flags=' + flags,
            '--build-property', 'compiler.c.extra_flags=' + flags,
            '--build-path', str(args.build_dir.resolve()), '--output-dir', str(args.output.resolve()),

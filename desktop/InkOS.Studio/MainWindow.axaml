@@ -2,24 +2,28 @@
  xmlns:views="clr-namespace:InkOS.Studio.Views" x:Class="InkOS.Studio.MainWindow" Title="InkOS Studio" Width="1160" Height="860" MinWidth="1040" MinHeight="720" WindowStartupLocation="CenterScreen" TitleBarAnimationEnabled="False" TitleFontWeight="Normal" TitleFontSize="12">
  <Grid ColumnDefinitions="224,*" RowDefinitions="*,Auto">
   <Border Grid.RowSpan="2" Background="#FAFAF9" BorderBrush="#E2E2E2" BorderThickness="0,0,1,0" Padding="22,30,22,22">
-   <Grid RowDefinitions="Auto,Auto,*,Auto">
-    <StackPanel Spacing="5" Margin="8,0,0,38"><TextBlock Text="InkOS" FontSize="30" FontWeight="Light"/><TextBlock Text="STUDIO / 0.3.0" Classes="label"/></StackPanel>
-    <StackPanel Grid.Row="1" x:Name="Navigation">
+   <Grid RowDefinitions="Auto,*,Auto">
+    <StackPanel Spacing="5" Margin="8,0,0,38"><TextBlock Text="InkOS" FontSize="30" FontWeight="Light"/><TextBlock Text="{Binding StudioVersion}" Classes="label"/></StackPanel>
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="Navigation">
      <Button x:Name="Nav0" Classes="nav active"  Tag="0" Click="SectionClick"><TextBlock Text="01  Calendars" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button>
      <Button x:Name="Nav1" Classes="nav"  Tag="1" Click="SectionClick"><TextBlock Text="02  Place &amp; time" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button>
      <Button x:Name="Nav2" Classes="nav"  Tag="2" Click="SectionClick"><TextBlock Text="03  Spotify" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button>
      <Button x:Name="Nav3" Classes="nav"  Tag="3" Click="SectionClick"><TextBlock Text="04  Energy" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button>
      <Button x:Name="Nav4" Classes="nav" Tag="4" Click="SectionClick"><TextBlock Text="05  Device" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button>
-    </StackPanel>
-    <StackPanel Grid.Row="3" Spacing="12">
+     <Button x:Name="Nav5" Classes="nav" Tag="5" Click="SectionClick"><TextBlock Text="06  Network" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+    </StackPanel></ScrollViewer>
+    <StackPanel Grid.Row="2" Spacing="12">
      <TextBlock Text="{Binding ConnectionLabel}" Classes="label"/>
-     <Grid ColumnDefinitions="*,Auto"><ComboBox ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort,Mode=TwoWay}" ToolTip.Tip="USB serial port" IsEnabled="{Binding !IsBusy}"/><Button Grid.Column="1" Classes="Ghost"  Width="36" Padding="0" Margin="6,0,0,0" Command="{Binding RefreshPortsCommand}" ToolTip.Tip="Refresh USB ports"><TextBlock Text="↻" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button></Grid>
+     <ComboBox SelectedIndex="{Binding ConnectionMode,Mode=TwoWay}" IsEnabled="{Binding !IsBusy}" HorizontalAlignment="Stretch"><ComboBoxItem Content="USB"/><ComboBoxItem Content="IP / Network"/></ComboBox>
+     <TextBox Text="{Binding NetworkAddress,Mode=TwoWay}" PlaceholderText="Device IP address" IsVisible="{Binding UseNetwork}" IsEnabled="{Binding !IsBusy}"/>
+     <TextBox Text="{Binding PairingKey,Mode=TwoWay}" PasswordChar="●" PlaceholderText="Pairing key" IsVisible="{Binding UseNetwork}" IsEnabled="{Binding !IsBusy}"/>
+     <Grid IsVisible="{Binding UseUsb}" ColumnDefinitions="*,Auto"><ComboBox ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort,Mode=TwoWay}" ToolTip.Tip="USB serial port" IsEnabled="{Binding !IsBusy}"/><Button Grid.Column="1" Classes="Ghost"  Width="36" Padding="0" Margin="6,0,0,0" Command="{Binding RefreshPortsCommand}" ToolTip.Tip="Refresh USB ports"><TextBlock Text="↻" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button></Grid>
      <Button  Classes="Outline" Command="{Binding ConnectCommand}" HorizontalAlignment="Stretch"><TextBlock Text="Connect / Read" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button>
-     <TextBlock Text="USB for setup.&#10;Independent thereafter." Classes="muted" FontSize="10" Margin="0,8,0,0"/>
+     <TextBlock Text="USB or encrypted IP setup.&#10;Independent thereafter." Classes="muted" FontSize="10" Margin="0,8,0,0"/>
     </StackPanel>
    </Grid>
   </Border>
-  <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+  <ScrollViewer x:Name="PageScroll" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
    <ContentControl x:Name="PageHost" Margin="42,34,42,32" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top"/>
   </ScrollViewer>
   <Border Grid.Column="1" Grid.Row="1" BorderBrush="#E2E2E2" BorderThickness="0,1,0,0" Padding="28,18">

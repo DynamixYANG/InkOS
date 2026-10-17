@@ -1,8 +1,11 @@
 #include "Canvas.h"
+#include "Text.h"
+#include "CjkAssets.h"
 #include <algorithm>
 #include <math.h>
 #include <string.h>
 namespace ink {
+void drawWeatherIcon(Canvas &,int,int,int,int,bool,unsigned,bool);
 void Canvas::clear(bool b) {
   memset(pixels, b ? 0 : 255, FRAME_BYTES);
 }
@@ -52,19 +55,6 @@ void Canvas::circle(int x, int y, int r, int stroke) {
         dot(x + xx, y + yy);
     }
 }
-static uint32_t utf8(const char *&s) {
-  uint8_t a = *s++;
-  if (a < 128)
-    return a;
-  int n = a < 224 ? 1 : a < 240 ? 2 : 3;
-  uint32_t cp = a & ((1 << (6 - n)) - 1);
-  for (int i = 0; i < n; i++) {
-    if ((*s & 192) != 128)
-      return '?';
-    cp = (cp << 6) | (*s++ & 63);
-  }
-  return cp;
-}
 static const Glyph *glyph(const Font &f, uint32_t cp) {
   int l = 0, r = f.count - 1;
   while (l <= r) {
@@ -79,49 +69,78 @@ static const Glyph *glyph(const Font &f, uint32_t cp) {
   }
   return nullptr;
 }
+static int advance(uint32_t cp, int size) {
+  auto &f=font(size); if(glyph(f,cp)) return f.advance;
+  CjkGlyph g; int step; return cjkLookup(cp,size,g,step)?step:f.advance;
+}
 void Canvas::text(int x, int baseline, const char *s, int size, bool black) {
-  const Font &f = font(size);
-  while (*s) {
-    uint32_t cp = utf8(s);
-    const Glyph *g = glyph(f, cp);
-    if (!g)
-      g = glyph(f, '?');
-    if (g) {
-      for (int y = 0; y < g->h; y++)
-        for (int xx = 0; xx < g->w; xx++) {
-          int bit = y * g->w + xx;
-          if (f.bits[g->offset + bit / 8] & (128 >> (bit & 7)))
-            dot(x + g->x + xx, baseline + g->y + y, black);
-        }
+  while(*s){
+    uint32_t cp=decodeUtf8(s);auto &face=font(size);auto g=glyph(face,cp);
+    const uint8_t *bits=nullptr;int gx=0,gy=0,w=0,h=0,step=face.advance;uint8_t raster[256];
+    CjkGlyph cg;
+    if(!g&&cjkLookup(cp,size,cg,step)){
+      if(cjkRead(cg,raster,sizeof raster)){bits=raster;gx=cg.x;gy=cg.y;w=cg.w;h=cg.h;}
+    }else{
+      if(!g)g=glyph(face,'?');
+      if(g){bits=face.bits+g->offset;gx=g->x;gy=g->y;w=g->w;h=g->h;}
     }
-    x += f.advance;
+    if(bits)for(int y=0;y<h;y++)for(int xx=0;xx<w;xx++){
+      int bit=y*w+xx;if(bits[bit/8]&(128>>(bit&7)))dot(x+gx+xx,baseline+gy+y,black);
+    }
+    x+=step;
   }
 }
 int Canvas::textWidth(const char *s, int size) {
-  int n = 0;
-  while (*s) {
-    utf8(s);
-    n++;
+  int width = 0;
+  while (*s) width += advance(decodeUtf8(s), size);
+  return width;
+}
+int Canvas::prefixBytes(const char *s, int width, int size, bool wordWrap) {
+  const char *p = s, *end = s, *space = nullptr;
+  int used = 0; uint32_t previous = 0, next = 0;
+  while (*p && *p != '\n') {
+    const char *start = p;
+    uint32_t cp = decodeUtf8(p);
+    int step = advance(cp, size);
+    if (used + step > width || p - s > 508) { next = cp; break; }
+    if (cp == ' ') space = start;
+    used += step; end = p; previous = cp;
   }
-  return n * font(size).advance;
+  // Keep Latin words together, but allow Chinese to break between glyphs.
+  if (wordWrap && space && space > s && next > 32 && next < 127 && previous >= 32 && previous < 127)
+    end = space;
+  return end - s;
 }
 void Canvas::centered(int x, int y, int w, const char *s, int size) {
   text(x + (w - textWidth(s, size)) / 2, y, s, size);
 }
-void Canvas::fit(int x, int y, int w, const char *s, int size) {
+void Canvas::fit(int x, int y, int w, const char *s, int size, bool black) {
+  if (w <= 0) return;
   char out[512];
-  strlcpy(out, s, sizeof out);
-  if (textWidth(out, size) <= w) {
-    text(x, y, out, size);
-    return;
+  int bytes = prefixBytes(s, w, size);
+  if (!s[bytes]) { text(x, y, s, size, black); return; }
+  const int ellipsis = textWidth("...", size);
+  if (ellipsis > w) return;
+  bytes = prefixBytes(s, w - ellipsis, size);
+  memcpy(out, s, bytes); memcpy(out + bytes, "...", 4);
+  text(x, y, out, size, black);
+}
+int Canvas::wrapped(int x, int baseline, int width, const char *s, int size, int maxLines, int lineHeight) {
+  int rows = 0;
+  while (*s && rows < maxLines) {
+    int bytes = prefixBytes(s, width, size, true);
+    if (!bytes && *s != '\n') break;
+    if (rows + 1 == maxLines && s[bytes] && s[bytes] != '\n') {
+      fit(x, baseline + rows * lineHeight, width, s, size);
+    } else {
+      char row[512]; memcpy(row, s, bytes); row[bytes] = 0;
+      text(x, baseline + rows * lineHeight, row, size);
+    }
+    s += bytes; if (*s == '\n') s++;
+    while (*s == ' ') s++;
+    rows++;
   }
-  int max = std::max(1, w / font(size).advance - 3);
-  const char *p = out;
-  for (int i = 0; i < max && *p; i++)
-    utf8(p);
-  int len = p - out;
-  strlcpy(out + len, "...", sizeof(out) - len);
-  text(x, y, out, size);
+  return rows;
 }
 void Canvas::dottedLine(int x, int y, int w) {
   for (int a = x; a < x + w; a += 6)
@@ -133,64 +152,7 @@ void Canvas::image(int x, int y, int w, int h, const uint8_t *b) {
       if (!(b[(yy * w + xx) / 8] & (128 >> ((yy * w + xx) & 7))))
         dot(x + xx, y + yy);
 }
-void Canvas::icon(int x, int y, int s, int code, bool day) {
-  if (code < 0) {
-    text(x + s / 3, y + s * 2 / 3, "?", s > 50 ? 32 : 20);
-    return;
-  }
-  bool sun = code <= 2, cloud = code >= 1, wet = code >= 51,
-       snow = (code >= 71 && code <= 77) || code == 85 || code == 86;
-  if (sun) {
-    int cx = x + s * 2 / 5, cy = y + s * 2 / 5, r = s / 7;
-    if (day) {
-      circle(cx, cy, r, 2);
-      for (int a = 0; a < 8; a++) {
-        float v = a * 0.785398f;
-        line(cx + cosf(v) * (r + 4), cy + sinf(v) * (r + 4), cx + cosf(v) * (r + 9),
-             cy + sinf(v) * (r + 9), 1);
-      }
-    } else {
-      circle(cx, cy, r + 3, 2);
-      rect(cx, cy - r - 5, r + 7, 2 * r + 10, false);
-    }
-  }
-  if (cloud) {
-    // Outline the union, rather than drawing overlapping circles inside the cloud.
-    auto inside = [&](int px, int py) {
-      auto disk = [&](int cx, int cy, int r) {
-        return (px - cx) * (px - cx) + (py - cy) * (py - cy) <= r * r;
-      };
-      return disk(s * 30 / 100, s * 50 / 100, s * 14 / 100) ||
-             disk(s * 50 / 100, s * 40 / 100, s * 20 / 100) ||
-             disk(s * 72 / 100, s * 52 / 100, s * 14 / 100) ||
-             (px >= s * 30 / 100 && px <= s * 72 / 100 && py >= s / 2 && py <= s * 66 / 100);
-    };
-    for (int py = 0; py < s; py++)
-      for (int px = 0; px < s; px++)
-        if (inside(px, py)) {
-          bool edge = !inside(px - 2, py) || !inside(px + 2, py) || !inside(px, py - 2) ||
-                      !inside(px, py + 2);
-          dot(x + px, y + py, edge);
-        }
-  }
-  if (wet) {
-    for (int a = 0; a < 3; a++) {
-      int px = x + s * (a + 2) / 6, py = y + s * 4 / 5;
-      if (snow) {
-        line(px - 3, py, px + 3, py);
-        line(px, py - 3, px, py + 3);
-      } else
-        line(px + 2, py - 3, px - 2, py + 4, 2);
-    }
-  }
-  if (code == 45 || code == 48) {
-    line(x + s / 5, y + s * 3 / 4, x + s * 4 / 5, y + s * 3 / 4);
-    line(x + s / 4, y + s * 7 / 8, x + s * 3 / 4, y + s * 7 / 8);
-  }
-  if (code >= 95) {
-    line(x + s / 2, y + s * 2 / 3, x + s / 2 - 5, y + s * 5 / 6, 2);
-    line(x + s / 2 - 5, y + s * 5 / 6, x + s / 2 + 3, y + s * 4 / 5, 2);
-    line(x + s / 2 + 3, y + s * 4 / 5, x + s / 2, y + s, 2);
-  }
+void Canvas::icon(int x,int y,int s,int code,bool day) {
+  drawWeatherIcon(*this,x,y,s,code,day,0,false);
 }
 } // namespace ink

@@ -1,0 +1,44 @@
+{
+  "inkos": true,
+  "ok": true,
+  "internal_bytes": 16777216,
+  "boot_metadata_reserved": 131072,
+  "partitions": [
+    {
+      "name": "ota_0",
+      "offset": 131072,
+      "bytes": 6225920,
+      "used_bytes": 1865872,
+      "free_bytes": 4360048
+    },
+    {
+      "name": "ota_1",
+      "offset": 6356992,
+      "bytes": 6225920,
+      "used_bytes": 1865872,
+      "free_bytes": 4360048
+    },
+    {
+      "name": "fonts",
+      "offset": 12582912,
+      "bytes": 4194304,
+      "used_bytes": 4185866,
+      "free_bytes": 8438
+    }
+  ],
+  "external": {
+    "jedec": 6176790,
+    "bytes": 4194304,
+    "spi_hz": 10000000,
+    "mounted": true,
+    "init_error": 0,
+    "filesystem_bytes": 4194304,
+    "used_bytes": 53248,
+    "free_bytes": 4141056
+  },
+  "nvs": {
+    "used_entries": 298,
+    "free_entries": 458
+  },
+  "snapshot_utc": "2026-10-17T12:31:41.314998+00:00"
+}

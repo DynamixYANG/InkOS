@@ -1,0 +1,44 @@
+{
+  "checks": [
+    {
+      "name": "final external-FS IP OTA A to B",
+      "passed": true,
+      "healthy": true
+    },
+    {
+      "name": "observed pending verification",
+      "slot": "ota_0",
+      "state": 1,
+      "healthy": false
+    },
+    {
+      "name": "native bootloader rollback after unconfirmed restart",
+      "passed": true
+    },
+    {
+      "name": "final external-FS IP OTA B to A",
+      "passed": true,
+      "healthy": true
+    }
+  ],
+  "complete": true,
+  "final_font_sha256": "ded63f2809bbadd5887b50fda6854d39f1cca884060063fa80b928608e5835e2",
+  "final_slot": "ota_0",
+  "extra_checks": {
+    "old_layout_rejected": true,
+    "oversized_image_rejected": true,
+    "wrong_font_rejected": true,
+    "wrong_board_rejected": true,
+    "external_file_write_read_remove": true,
+    "configuration_preserved": true,
+    "wifi": true,
+    "spotify": true,
+    "remote_enabled": true
+  },
+  "startup_checks": {
+    "passed": 119,
+    "total": 119
+  },
+  "python_checks": 21,
+  "studio_checks": 9
+}

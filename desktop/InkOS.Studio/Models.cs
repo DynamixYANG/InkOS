@@ -5,6 +5,8 @@ public sealed class DisplaySettings {
  public string location {get;set;}="Oulu";public string zone {get;set;}="Europe/Helsinki";
  public double latitude {get;set;}=65.0121;public double longitude {get;set;}=25.4651;
  public int weather_source {get;set;}=0;public bool animations {get;set;}=false;
+ public int page_switch_delay_ms {get;set;}=500;
+ public int encoder_lock_ms {get;set;}=2000;
  public string met_contact {get;set;}="";
  public List<ClockSettings> worlds {get;set;}=[new(){label="Beijing",zone="Asia/Shanghai"},new(){label="London",zone="Europe/London"}];
 }

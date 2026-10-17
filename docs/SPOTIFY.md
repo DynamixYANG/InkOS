@@ -2,9 +2,9 @@
 
 ## 运行方式
 
-音乐在手机、电脑或其他 Spotify 播放设备上播放。ESP32 不播放音频，它直接查询官方 Web API 的当前播放信息，下载封面，并按歌曲、歌手和时长匹配 LRCLIB 同步歌词。
+音乐在手机、电脑或其他 Spotify 播放设备上播放。ESP32 不播放音频，它直接查询官方 Web API 的当前播放信息，下载封面，并依次查询 LRCLIB 精确记录、LRCLIB 搜索候选和网易云逐行歌词。所有候选都校验歌名、歌手、时长与版本。
 
-Studio 只完成一次性的 PKCE 浏览器授权和 USB 传输。之后 refresh token 存在设备 NVS，ESP32 直接续期，不需要常驻电脑服务器。
+Studio 只完成一次性的 PKCE 浏览器授权和 USB／配对加密 IP 传输。之后 refresh token 存在设备 NVS，ESP32 直接续期，不需要常驻电脑服务器。
 
 ## 创建个人开发者应用
 
@@ -23,13 +23,13 @@ http://127.0.0.1:8768/callback
 
 ## 在 Studio 授权
 
-1. 把设备 USB 连接到运行 Studio 的电脑，选择串口并 Connect / Read。
+1. Studio 通过 USB 或已配对的 IP 连接屏幕，点击 Connect / Read。
 2. 打开 Spotify 区域，粘贴 32 字符 Client ID。
 3. 点击 Authorize Spotify，浏览器进入官方账号页面；核对账号后同意权限。
-4. 浏览器回到本机 `127.0.0.1:8768/callback`，Studio 接收授权码、交换 token，并通过 USB 保存到屏幕。
+4. 浏览器回到本机 `127.0.0.1:8768/callback`，Studio 接收授权码、交换 token，并通过当前 USB／配对加密 IP 通道保存到屏幕。
 5. 应用显示授权已保存后，在手机或音箱上开始播放，切换屏幕到 Music 页。
 
-浏览器和 Studio 的 callback 应运行在同一台电脑上。若换另一台电脑完成设置，需要把设备接过去并在那台电脑运行 Studio。只把 localhost 地址发到另一台电脑不能完成当前实例的回调。
+浏览器和 Studio 的 callback 应运行在同一台电脑上。若换另一台电脑完成设置，需要在那台电脑运行 Studio，通过 USB 或已配对 IP 连接屏幕。只把 localhost 地址发到另一台电脑不能完成当前实例的回调。
 
 Studio 回调端口是 **8768**；旧 Python helper 的 Spotify 回调是 **8767**。两种流程选择其一，并在 Dashboard 注册对应 URI，不要混用。
 
@@ -48,8 +48,11 @@ Music 页约每 5 秒查询播放状态，其他页约每 30 秒。两次响应�
 | Redirect URI 错误 | scheme、127.0.0.1、8768、/callback、尾斜线是否逐字匹配 |
 | 浏览器能登录但 API 403 | 应用模式、Premium、测试账号 allowlist、账号是否一致 |
 | NO ACTIVE PLAYBACK | 账号当前是否真的有活动播放；等待一个采样周期 |
-| 有歌名但无歌词 | LRCLIB 是否有相同版本、歌手和时长；并非所有曲目都有同步歌词 |
-| 中文变成问号 | 当前字库没有 CJK；后续需要字体扩展 |
+| 有歌名但无歌词 | LRCLIB／网易云是否有相同版本、歌手和时长；并非所有曲目都有同步歌词 |
+| 中文变成问号 | 更新到固件 0.4.2；基本平面简繁体已内置，Emoji／补充平面少见字仍未覆盖 |
 | 授权过期／撤销 | 在 Studio 重新授权，不向仓库提交 token |
 
 Disconnect 仅移除设备上的相关授权数据，不删除 Spotify 账号。真实个人账号授权仍需用户完成；仓库中的合成自检和静态页面不代表账号已连通。
+
+
+中文歌词的多来源接入评估见 [LYRICS-SOURCES](LYRICS-SOURCES.md)。0.4.3 已接入 LRCLIB 搜索与网易云；本地 LRC、QQ／酷狗与来源设置仍是后续方案。

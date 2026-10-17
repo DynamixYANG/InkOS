@@ -1,0 +1,27 @@
+{
+  "version": "0.7.1",
+  "healthy": true,
+  "startup_checks": 170,
+  "invalid_lock_values_rejected": 5,
+  "custom_lock_persisted_after_restart": true,
+  "default_restored_and_persisted": true,
+  "old_client_omission_preserves_value": true,
+  "burst_targets": [
+    1,
+    2,
+    6
+  ],
+  "preview_only_final_target": true,
+  "full_refresh_only_final_target": true,
+  "quiet_after_visible_ms": 547,
+  "full_refresh_seconds": 4.172,
+  "lock_confirmed_by_live_status": true,
+  "settings_feeds_energy_preserved": true,
+  "physical_rotation_071_acceptance_pending": true,
+  "final_page": 0,
+  "idle_burst_title_visible_seconds": 1.125,
+  "final_zero_lock_pending_detent_regression_passed": true,
+  "busy_panel_burst_title_visible_seconds": 3.297,
+  "busy_panel_note": "An already-started settings full refresh delayed the initial burst; it cannot be interrupted. The idle timing below measures the final build without that pre-existing work.",
+  "firmware_sha256": "7a7007c067e2a4104ce10718da42f5f367942cf2f0b8985e05689c57d71e2e1e"
+}

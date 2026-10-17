@@ -4,7 +4,7 @@
 
 页面只接收 typed snapshot；provider 只产出领域模型；Panel 只接收像素帧。UI 控件不直接发底层串口字节，统一通过 DeviceClient。这样改页面、换服务和换显示驱动能够分别验证。
 
-固件源码原有行为保持为 0.3.1。整理仓库主要修改工具可移植性、项目构建配置、文档与发布结构，不扩展网络功能，也不在页面代码中放设置密码。
+页面、加密配置传输和外部数据 adapter 分别维护。0.4 加入网络配置，0.4.1 加入周网格；页面代码不包含设置密码。
 
 ## 修改一个页面
 
@@ -18,7 +18,7 @@
 
 ## 添加页面
 
-需要同时维护 Domain.h 的 Page/Count、pageAfter 导航、自检、Runtime 的 renderer 分派、Chrome 的名称和页码、本地 web 按钮，以及 Studio 的导航说明。不可只把页面加到枚举却遗漏循环边界。
+需要同时维护 Domain.h 的 Page/Count、pageAfter 导航、自检、Runtime 的 renderer 分派、Chrome 的名称和页码、renderNavigationTitle 的预览标题、本地 web 按钮，以及 Studio 的导航说明。不可只把页面加到枚举却遗漏循环边界。
 
 新页面明确选择全刷与内容局刷策略。不能在 renderer 发 HTTP、等待 SPI 或写 NVS；网络数据应该预先准备在 Model 中。
 
@@ -47,7 +47,7 @@ ArtworkFixture.h 是独立合成灰度样本；真实封面受各自权利和服
 
 ## 桌面应用
 
-五个 View 独立，ViewModel 的 Commands 负责 busy/cancel/validation，串口请求必须经同一个 gate 串行执行。新增设置同时验证输入合法性、USB DTO、固件边界和保存语义。
+六个 View 独立，ViewModel 的 Commands 负责 busy/cancel/validation，USB/IP 请求必须经同一个 gate 串行执行。新增设置同时验证输入合法性、USB DTO、固件边界和保存语义。
 
 密码型文本要双向绑定，但不能为调试打印敏感值。Energy 的空 key 表示保留，而不是用空字符串抹掉；修改此行为要连同 UI 提示和固件一并设计。
 
@@ -66,3 +66,11 @@ dotnet build desktop/InkOS.Studio/InkOS.Studio.csproj -c Release --no-restore
 编译通过不代表真实账号、实体屏幕对比度或全部日历规则已验证。验证报告明确区分离线、构建、硬件和人工观察。
 
 构建产物在 out，私有文件在 .local 或仓库外。发布前用允许清单打包，检查 Git 暂存列表与 ZIP 内容。Release 只附三件套固件、完整 Studio 目录 ZIP 与 SHA256SUMS，不附原始 NVS 或串口配置响应。
+
+日历布局可使用 `preview_calendars.py` 导出不含私人数据的合成帧，具体约定见 [CALENDAR](CALENDAR.md)。
+
+
+中文 fallback 由 `CjkAssets.cpp` 读取共享 Flash 归档，生成器为 `tools/generate_cjk_fonts.py`，字库覆盖及许可证见 [DISPLAY](DISPLAY.md)。`Text.cpp` 处理 UTF-8 边界，Canvas 统一解析字形和像素宽度；页面不要再用字符个数乘英文 advance 估算混排宽度。新增脚本或字体需保留原有 Latin 字模基线。
+
+
+歌词来源从 0.4.3 起由可替换的 `LyricsTransport` 驱动；`LyricsResolverChecks.cpp` 使用原创合成响应，不访问网络。开发用 `python tools/probe_lyrics.py --port COM9` 对实际 ESP32 查询固定曲目，仅记录去敏状态。Source 选择与错误退避应在 resolver 中修改；显示层继续只消费逐行时间轴。

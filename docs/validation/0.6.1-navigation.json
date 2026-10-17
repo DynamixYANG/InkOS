@@ -1,0 +1,66 @@
+{
+  "version": "0.6.1",
+  "checks": [
+    {
+      "name": "IP OTA and boot checks",
+      "passed": true,
+      "healthy": true,
+      "selftest": 132,
+      "original_configuration_preserved": true
+    },
+    {
+      "name": "Default title-first navigation",
+      "passed": true,
+      "delay_ms": 500,
+      "measured_wait_seconds": 0.552,
+      "full_frames": 1
+    },
+    {
+      "name": "Repeated presses coalesce",
+      "passed": true,
+      "requested_pages": [
+        5,
+        4,
+        3
+      ],
+      "committed_pages": [
+        3
+      ],
+      "full_frames": 1,
+      "measured_wait_seconds": 0.521
+    },
+    {
+      "name": "Preview changes title only",
+      "passed": true,
+      "changed_bytes": 238,
+      "body_price_footer_unchanged": true,
+      "delay_ms": 2000,
+      "measured_wait_seconds": 2.036
+    },
+    {
+      "name": "Delay validation and legacy clients",
+      "passed": true,
+      "invalid_values_rejected": true,
+      "omitted_field_preserved": true
+    },
+    {
+      "name": "Reboot persistence and final configuration",
+      "passed": true,
+      "persisted_delay_ms": 900,
+      "final_delay_ms": 500,
+      "healthy": true,
+      "accounts_and_original_settings_preserved": true
+    }
+  ],
+  "complete": true,
+  "firmware_sha256": "b3bd035c8fe3544c47310130bb555f02848d0c8a1ece4c28d9a0c740dcb546d6",
+  "date": "2026-10-17T13:00:26.991438+00:00",
+  "navigation_requests": "Paired IP through the same selectPage/navigatePage handlers used by physical keys",
+  "observations": "USB serial refresh timing and framebuffer byte comparison",
+  "studio_selftest": 11,
+  "python_tests": 21,
+  "limitations": [
+    "No new long-term optical contrast or ghosting acceptance test",
+    "An already-started physical refresh cannot be cancelled"
+  ]
+}

@@ -29,6 +29,7 @@
     "76": 330,
     "96": 330
   },
-  "coverage": "ASCII, Latin-1, Latin Extended-A, selected punctuation; additional scripts need another font provider",
-  "checks": "Monospaced advances; ASCII/Finnish/degree coverage; one-pixel H stems at all UI sizes"
+  "coverage": "ASCII, Latin-1, Latin Extended-A, selected punctuation; CJK fallback is generated separately by generate_cjk_fonts.py",
+  "checks": "Monospaced advances; ASCII/Finnish/degree coverage; one-pixel H stems at all UI sizes",
+  "fallback_manifest": "source-han-sans/manifest.json"
 }

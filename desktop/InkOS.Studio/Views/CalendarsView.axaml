@@ -1,9 +1,10 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="InkOS.Studio.Views.CalendarsView">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:InkOS.Studio.Views" x:Class="InkOS.Studio.Views.CalendarsView">
  <StackPanel>
-  <TextBlock Text="CALENDARS / 01" Classes="label"/><TextBlock Text="Your week, together." Classes="title" Margin="0,0,0,10"/>
-  <TextBlock Text="Read-only subscriptions for the weekly agenda and your next event.&#10;The screen fetches enabled calendars directly over Wi-Fi." Classes="muted" Margin="0,0,0,15"/>
+  <TextBlock Text="CALENDARS / 01" Classes="label"/><TextBlock Text="Today and the next six days." Classes="title" Margin="0,0,0,10"/>
+  <TextBlock Text="A rolling seven-day agenda and your next event.&#10;The screen fetches enabled calendars directly over Wi-Fi." Classes="muted" Margin="0,0,0,15"/>
+  <views:ICloudView/>
   <Border Classes="section"><StackPanel Spacing="10">
-   <Grid ColumnDefinitions="*,Auto"><CheckBox Content="Apple / iCloud" IsChecked="{Binding Feeds[0].enabled,Mode=TwoWay}"/><Button Grid.Column="1" Classes="Ghost"  Command="{Binding OpenLinkCommand}" CommandParameter="https://support.apple.com/guide/icloud/share-a-calendar-mm6b1a9479/icloud"><TextBlock Text="Setup guide ↗" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button></Grid>
+   <Grid ColumnDefinitions="*,Auto"><CheckBox Content="Apple / optional public subscription" IsChecked="{Binding Feeds[0].enabled,Mode=TwoWay}"/><Button Grid.Column="1" Classes="Ghost"  Command="{Binding OpenLinkCommand}" CommandParameter="https://support.apple.com/guide/icloud/share-a-calendar-mm6b1a9479/icloud"><TextBlock Text="Setup guide ↗" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button></Grid>
    <Grid ColumnDefinitions="190,16,*"><StackPanel><TextBlock Text="CALENDAR NAME" Classes="label"/><TextBox Text="{Binding Feeds[0].name,Mode=TwoWay}" PlaceholderText="Personal"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="SHARED ICS / WEBCAL URL" Classes="label"/><TextBox Text="{Binding Feeds[0].url,Mode=TwoWay}" PasswordChar="●" PlaceholderText="Paste subscription link"/></StackPanel></Grid>
    <TextBlock Text="Use the shared/public link from iCloud. Apple account sign-in is not required." Classes="muted" FontSize="11"/>
   </StackPanel></Border>

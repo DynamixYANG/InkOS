@@ -1,0 +1,72 @@
+{
+  "firmware": "0.4.1",
+  "date": "2026-10-16",
+  "hardware": "Seeed TRMNL 7.5 OG DIY / XIAO ESP32-S3 Plus",
+  "application_sha256": "9abcec6953049ba7f4684ea690f29330eb7f9829b4bbb6165c8f290e9bb4e6bf",
+  "startup_selftest": {
+    "passed": 74,
+    "total": 74
+  },
+  "calendar_layout_checks": [
+    "ISO week year boundaries",
+    "timed overlap groups and lane reuse",
+    "bounded overlap overflow",
+    "midnight exclusive end",
+    "zero-duration events",
+    "multi-day all-day spans and overflow",
+    "Finland DST fall-back",
+    "visible time range mapping"
+  ],
+  "synthetic_previews": [
+    {
+      "file": "../images/calendar/home-weeks.png",
+      "sha256": "0daae496bdf44bef7fd9790b0cc36b48331b65beb78b233604127b10627950c1"
+    },
+    {
+      "file": "../images/calendar/week-grid.png",
+      "sha256": "04936bd4554ee2494da2e33369595ce6eb694ee5bd63203548f55cb15e0ab619"
+    },
+    {
+      "file": "../images/calendar/week-crowded.png",
+      "sha256": "a9465650028d63758cb3006aee80152cd82c36d51856b2a47c1d9aee55557f67"
+    },
+    {
+      "file": "../images/calendar/week-dst.png",
+      "sha256": "7a1bdee0b783226a00f2796476e6493f61eff7acb490ac2631ee74e0ed11b2fd"
+    },
+    {
+      "file": "../images/calendar/home-iso-year.png",
+      "sha256": "c5043c70bbe5cb6ce6bd7ef59c099d4719091f0d4bbe8478c9ba294e17e06bea"
+    },
+    {
+      "file": "../images/calendar/home-six-rows.png",
+      "sha256": "41fbadce64dc1e2702fc5c539aeafaac8f2311090d9993e935c397edd919e78d"
+    }
+  ],
+  "final_home_polish": {
+    "changed_pixel_bbox": [
+      465,
+      81,
+      495,
+      307
+    ],
+    "confined_to_week_number_rail": true
+  },
+  "device_verification": {
+    "flashed_and_hash_verified": true,
+    "configuration_fingerprint_unchanged": true,
+    "wifi_connected": true,
+    "spotify_configured": true,
+    "calendar_configured": true,
+    "calendar_event_count": 5,
+    "calendar_stale": false,
+    "returned_to_home": true,
+    "real_home_and_week_frames_checked_privately": true
+  },
+  "display": {
+    "fonts_unchanged": true,
+    "factory_refresh_waveforms_unchanged": true,
+    "long_term_physical_contrast_tested_for_this_layout": false
+  },
+  "privacy": "Only synthetic calendar images are published; live calendar frames, configuration and backups remain private."
+}

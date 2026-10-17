@@ -4,28 +4,24 @@
 
 初始 Wi-Fi → Studio 连接 USB → 读取当前设置 → 修改并保存 → 等待屏幕联网更新。Studio 不充当运行时服务器。
 
-首版上位机没有单独的 Wi-Fi 设置页，使用仓库附带的临时 Python helper 配网。不要把 Wi-Fi 密码写进源码。
+Studio 0.4 的 Network 页面直接配置 Wi-Fi：USB Connect / Read → Network → 网络名称和密码动作 → Save Wi-Fi。首次 USB 配对后还可通过 IP 使用所有配置页；详见 [Wi-Fi 与 IP 配置](NETWORK.md)。原临时 Python helper 仍用于兼容旧流程，但正常配网不再需要它。
 
-```powershell
-$env:INKOS_PORT = 'COM9'
-python tools/setup.py
-```
+`127.0.0.1` 指向运行 helper 的电脑。旧 helper 换电脑时需要把 USB 接过去；新版 Studio 可在 USB 配对后直接通过 IP 设置，无需把临时页面暴露到局域网。
 
-浏览器打开 `http://127.0.0.1:8767/`，只在本机输入 2.4 GHz SSID 和密码，点击 Save Wi-Fi to device。完成后按 Ctrl+C 关闭 helper，释放串口，再启动 Studio。已有 Wi-Fi 可以直接保留，不必重复配置。
-
-`127.0.0.1` 指向运行 helper 的电脑。要换电脑设置，需要把设备 USB 接到那台电脑，在那里运行 helper 或 Studio；无需把临时页面暴露到局域网。
-
-## Studio 五个区域
+## Studio 六个区域
 
 | 区域 | 配置 |
 |---|---|
-| Calendars | Apple、Google、Outlook 三个订阅槽；名称、URL、启用开关 |
+| Calendars | iCloud 私有日历列表与单个选择；Apple／Google／Outlook 公共或私密 ICS 订阅槽 |
 | Place & time | 地区标签、经纬度、本地时区、两个世界时钟、天气源、高频主页更新 |
 | Spotify | Client ID、官方授权、授权状态、移除授权 |
 | Energy | 开关、数据源、VAT、margin、transmission、费用含税选项、可选 API 凭据 |
-| Device | 上一页、下一页、主页和重新读取设置 |
+| Device | 上一页、下一页、主页、切页停按等待时间（默认 0.5 秒）和重新读取设置 |
+| Network | Wi-Fi、设备 IP、USB 配对密钥、启用／撤销 IP 配置 |
 
-选择实际 USB 串口，点击 Connect / Read。应用先检查 InkOS 0.3 协议版本，然后读取设备配置，避免拿空白默认值覆盖已有设置。修改完成再 Save to screen，等状态显示已保存。
+选择实际 USB 串口，点击 Connect / Read。IP 模式选择 IP / Network，输入设备 IP 和配对密钥。应用先检查 InkOS 0.3–0.7 协议版本，然后读取设备配置，避免拿空白默认值覆盖已有设置。修改完成再 Save to screen，等状态显示已保存。
+
+固件 0.6.1 起，Device → Page selection delay / seconds 设置切页等待时间，范围 0.1–5 秒，默认 0.5。按键先局刷左上角页名，停止选择并经过等待后再全刷；等待时间从标题显示完成开始计算。详见 [刷新策略](DISPLAY.md)。
 
 ## Google Calendar：只订阅日历，不读取邮件
 
@@ -43,9 +39,9 @@ python tools/setup.py
 
 ## Apple / iCloud
 
-在 iCloud 日历的共享设置中取得“公共日历”提供的 webcal 链接，填入 Apple 槽。固件将 `webcal://` 规范化为 HTTPS。是否公开共享由账户主人自行决定；应用只读取已经提供的订阅地址，不操作账号共享权限。
+固件／Studio 0.7 起使用 [iCloud 私有日历设置](ICLOUD.md)：在 App 输入 Apple Account 和专用密码，Load calendars 后选择一个日历并 Save iCloud to screen。无需公开日历，也无需常驻电脑；设备直接读取选中的 CalDAV 集合。
 
-本版没有私有 CalDAV、Apple 账号登录或应用专用密码接口。如果不愿启用共享链接，可先不接入该源，后续扩展 OAuth/CalDAV adapter。
+原有公共 webcal/ICS 链接仍作为可选订阅方式保留。当前私有 iCloud 选择与另外三个订阅槽独立；启用多个来源会合并显示。该配置不读取邮件，也不修改线上事件。
 
 ## Outlook / Microsoft
 
@@ -53,7 +49,7 @@ python tools/setup.py
 
 ## 日程的显示与边界
 
-设备约每 15 分钟拉取启用的源。主页显示当前／下一个事项，Week 显示本地时区周一到周日。每天最多两条事项；额外事项显示 `+N`。跨天事件按 `[start,end)` 与每天区间求交，全天事项保留全天语义。
+设备约每 15 分钟拉取启用的源。主页显示当前／下一个事项，Agenda 显示本地时区今天起连续七天的时间网格：日期在上、事件在下，全天横条最多两行，重叠的定时事件最多并排两列；额外条块在日期表头显示 `+N`。详见 [周网格布局](CALENDAR.md)。跨天事件按 `[start,end)` 与每天区间求交，全天事项保留全天语义。
 
 支持常见 RRULE、EXDATE、RDATE 和单次实例覆盖；展开窗口 35 天，最多保留最近 96 条。某些复杂、未知时区或超限日历会报错并保留旧缓存，不能保证任意 ICS 文件都被完整解释。
 
@@ -66,3 +62,11 @@ Oulu 默认坐标 `65.0121, 25.4651`，本地时区 `Europe/Helsinki`。北京 `
 天气源可选 Open-Meteo 或 MET Norway（yr.no 背后的气象服务）。MET 的 User-Agent/contact 可配置；不要填含换行的值。数据源切换后等待新数据，失败时保留旧结果并标记状态。
 
 Frequent Home updates 控制图标动画和冒号闪烁，默认关闭。即使打开，也受工厂波形耗时限制，不能保证 0.5 秒刷新。
+
+### Encoder lock (Studio 0.7.1 / firmware 0.7.1+)
+
+In **Device → ENCODER LOCK / SECONDS**, set 0–10 seconds (default 2); 0 disables. Click **Save to screen** over USB or paired IP. This is separate from **PAGE SELECTION DELAY** (default 0.5 seconds after the preview becomes visible). When selection settles, the lock begins and physical rotation during the interval is discarded. Home remains available. An ongoing full refresh must finish even if the lock expires first.
+
+### Page quiet interval in 0.7.2
+
+The selection delay is measured from the last turn/press, overlapping the title refresh. After that delay has elapsed and the final title has been visible for at least 0.1 seconds, full refresh begins. Existing stored values are retained (default 0.5 seconds). The separately configured encoder lock still starts when the full refresh is accepted.

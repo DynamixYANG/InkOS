@@ -52,58 +52,42 @@ void solarEventIcon(Canvas &c, int x, int y, bool rising, int size) {
   c.line(x + size - 2, base - 6, x + size, base - 8);
 }
 void renderHomeAstronomy(Canvas &c, const Settings &s, time_t now) {
-  c.line(layout::WeatherDivider, 320, layout::WeatherDivider, layout::HomeBottom);
-  c.line(layout::MoonDivider, 320, layout::MoonDivider, layout::HomeBottom);
-  if (!Clock::valid()) {
-    c.centered(232, 360, 64, "--", 18);
-    c.text(layout::SolarLeft, 352, "SUN", 14);
-    c.text(layout::SolarLeft, 376, "--:--", 16);
-    return;
-  }
+  c.line(layout::WeatherDivider, 260, layout::WeatherDivider, layout::HomeBottom);
+  c.line(layout::MoonDivider, 260, layout::MoonDivider, layout::HomeBottom);
+  if (!Clock::valid()) { c.centered(232, 354, 76, "--", 18); return; }
   auto moon = moonState(now);
-  moonIcon(c, 264, 350, 21, moon.phase, moon.illuminated, s.latitude < 0);
-  int i = moonPhaseIndex(moon.phase);
-  const char *first[] = {"NEW", "WAXING", "FIRST", "WAXING", "FULL", "WANING", "LAST", "WANING"};
-  const char *second[] = {"MOON", "CRES.", "QUARTER", "GIBB.", "MOON", "GIBB.", "QUARTER", "CRES."};
-  c.centered(232, 392, 64, first[i], 14);
-  c.centered(232, 412, 64, second[i], 14);
-  char b[32];
-  snprintf(b, sizeof b, "%.0f%%", moon.illuminated * 100);
-  c.centered(232, 432, 64, b, 14);
+  moonIcon(c, 270, 354, 33, moon.phase, moon.illuminated, s.latitude < 0);
   auto pair = adjacentSolarEvents(now, s.latitude, s.longitude);
-  for (int k = 0; k < 2; k++) {
-    auto event = k ? pair.next : pair.previous;
-    int y = 332 + k * 60;
-    c.text(layout::SolarLeft, y, k ? "NEXT" : "PREV", 14);
-    if (event.at)
-      solarEventIcon(c, layout::SolarLeft, y + 5, event.rising, 18);
-    clockText(b, sizeof b, event.at, s.localZone);
-    c.text(layout::SolarLeft + 24, y + 20, b, 16);
-    dateText(b, sizeof b, event.at, s.localZone);
-    c.text(layout::SolarLeft + 24, y + 40, b, 14);
+  char b[24];
+  for (int k=0;k<2;k++) {
+    auto event=k?pair.next:pair.previous;int y=292+k*94;
+    c.text(layout::SolarLeft,y,k?"NEXT":"PREV",14);
+    if(event.at)solarEventIcon(c,layout::SolarLeft,y+15,event.rising,18);
+    clockText(b,sizeof b,event.at,s.localZone);
+    c.text(layout::SolarLeft+26,y+34,b,20);
   }
 }
 void renderMoon(Canvas &c, const Model &m, time_t now) {
   renderChrome(c, "LUNAR CALENDAR", Page::Moon, m);
   if (!Clock::valid()) {
-    c.text(24, 100, "Waiting for clock sync", 24);
+    c.text(12, 100, "Waiting for clock sync", 24);
     return;
   }
   auto moon = moonState(now);
   char b[96];
   int index = moonPhaseIndex(moon.phase);
-  c.text(24, 88, "CURRENT PHASE", 14);
-  c.fit(24, 129, 310, moonPhaseName(index), 28);
-  c.text(350, 88, "ILLUMINATION", 14);
+  c.text(12, 88, "CURRENT PHASE", 14);
+  c.fit(12, 129, 240, moonPhaseName(index), 28);
+  c.text(272, 88, "ILLUMINATION", 14);
   snprintf(b, sizeof b, "%.1f%%", moon.illuminated * 100);
-  c.text(350, 129, b, 28);
+  c.text(272, 129, b, 28);
   auto lastNew = moonPhaseEvent(now, 0, false);
-  c.text(610, 88, "LUNAR AGE / DAYS", 14);
+  c.text(532, 88, "LUNAR AGE / DAYS", 14);
   snprintf(b, sizeof b, "%.1f", lastNew ? double(now - lastNew) / 86400 : 0.);
-  c.text(610, 129, b, 28);
+  c.text(532, 129, b, 28);
   time_t wall = localWall(now, m.settings.localZone);
   for (int k = 0; k < 7; k++) {
-    int x = 24 + k * 108;
+    int x = 12 + k * 111;
     time_t stamp =
         k == 3 ? now : fromZone(wall + (k - 3) * 3 * 86400 + 43200, m.settings.localZone);
     auto state = moonState(stamp);
@@ -114,36 +98,36 @@ void renderMoon(Canvas &c, const Model &m, time_t now) {
       c.text(x + 32, 177, b, 14, false);
     } else
       c.centered(x, 177, 104, b, 14);
-    moonIcon(c, x + 52, 235, 31, state.phase, state.illuminated, m.settings.latitude < 0);
+    moonIcon(c, x + 54, 248, 34, state.phase, state.illuminated, m.settings.latitude < 0);
     const char *name = moonPhaseName(moonPhaseIndex(state.phase));
     char row[32];
     strlcpy(row, name, sizeof row);
     char *split = strchr(row, ' ');
     if (split) {
       *split++ = 0;
-      c.centered(x, 291, 104, row, 14);
-      c.centered(x, 307, 104, split, 14);
+      c.centered(x, 308, 104, row, 14);
+      c.centered(x, 326, 104, split, 14);
     } else
-      c.centered(x, 299, 104, row, 14);
+      c.centered(x, 316, 104, row, 14);
   }
-  c.line(24, 329, 775, 329);
+  c.line(12, 348, 787, 348);
   int nextQuarter = (int(floor(moon.phase * 4)) + 1) % 4;
   for (int k = 0; k < 3; k++) {
-    int x = 24 + k * 254;
+    int x = 12 + k * 260;
     int quarter = k == 0 ? nextQuarter : k == 1 ? 2 : 0;
     time_t event = moonPhaseEvent(now, quarter);
-    c.text(x, 356, k == 0 ? "NEXT PRIMARY PHASE" : k == 1 ? "NEXT FULL MOON" : "NEXT NEW MOON", 14);
+    c.text(x, 380, k == 0 ? "NEXT PRIMARY PHASE" : k == 1 ? "NEXT FULL MOON" : "NEXT NEW MOON", 14);
     auto d = inZone(event, m.settings.localZone);
     snprintf(b, sizeof b, "%02d.%02d.%04d", d.tm_mday, d.tm_mon + 1, d.tm_year + 1900);
-    c.text(x, 388, event ? b : "--", 20);
-    c.fit(x, 414, 237, moonPhaseName(quarter * 2), 16);
+    c.text(x, 414, event ? b : "--", 20);
+    c.fit(x, 446, 244, moonPhaseName(quarter * 2), 16);
   }
-  c.text(24, 438, "Local calculation / approximate astronomical dates", 14);
+
 }
 void renderSun(Canvas &c, const Model &m, time_t now) {
   renderChrome(c, "SUNRISE / SUNSET", Page::Sun, m);
   if (!Clock::valid()) {
-    c.text(24, 100, "Waiting for clock sync", 24);
+    c.text(12, 100, "Waiting for clock sync", 24);
     return;
   }
   const auto &s = m.settings;
@@ -151,17 +135,17 @@ void renderSun(Canvas &c, const Model &m, time_t now) {
          end = fromZone(wall + 86400, s.localZone);
   auto sun = solarDay(fromZone(wall + 43200, s.localZone), s.latitude, s.longitude);
   char b[96];
-  c.fit(24, 77, 600, s.location, 16);
+  c.fit(12, 77, 600, s.location, 16);
   for (int k = 0; k < 2; k++) {
-    int x = k ? 500 : 56;
-    c.text(x, 105, k ? "SUNSET" : "SUNRISE", 16);
+    int x = 12 + k * 400;
+    c.centered(x, 105, 376, k ? "SUNSET" : "SUNRISE", 16);
     clockText(b, sizeof b, k ? sun.set : sun.rise, s.localZone);
-    c.text(x, 157, b, 48);
+    c.centered(x, 157, 376, b, 48);
   }
   if (sun.polarDay || sun.polarNight)
     c.centered(200, 183, 400,
                sun.polarDay ? "POLAR DAY / SUN ABOVE HORIZON" : "POLAR NIGHT / NO SUNRISE", 16);
-  constexpr int gx = 40, gy = 198, gw = 720, gh = 135, steps = 120;
+  constexpr int gx = 24, gy = 198, gw = 752, gh = 160, steps = 120;
   double alt[steps + 1], low = -1, high = 1;
   for (int i = 0; i <= steps; i++) {
     alt[i] = solarAltitude(start + (end - start) * i / steps, s.latitude, s.longitude);
@@ -191,16 +175,16 @@ void renderSun(Canvas &c, const Model &m, time_t now) {
     time_t stamp = fromZone(wall + h * 3600, s.localZone);
     int x = gx + int(double(stamp - start) / (end - start) * gw);
     snprintf(b, sizeof b, "%02d", h);
-    c.text(std::min(x - 7, 754), 353, b, 14);
+    c.text(std::min(x - 7, 754), 378, b, 14);
   }
   const char *labels[] = {"CIVIL DAWN", "SOLAR NOON", "CIVIL DUSK"};
   time_t times[] = {sun.dawn, sun.noon, sun.dusk};
   for (int i = 0; i < 3; i++) {
-    int x = 48 + i * 254;
-    c.text(x, 383, labels[i], 14);
+    int x = 24 + i * 260;
+    c.text(x, 410, labels[i], 14);
     clockText(b, sizeof b, times[i], s.localZone);
-    c.text(x, 418, b, 28);
+    c.text(x, 450, b, 28);
   }
-  c.text(24, 439, "Estimated / level horizon / civil twilight -6 deg", 14);
+
 }
 } // namespace ink
