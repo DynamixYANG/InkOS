@@ -2,6 +2,7 @@
 #include "CjkAssets.h"
 #include "CjkAssetsData.h"
 #include "Storage.h"
+#include "Log.h"
 #include <Arduino.h>
 #include <esp_ota_ops.h>
 #include <esp_app_format.h>
@@ -18,7 +19,7 @@
 // self-test and panel checks run. Defer confirmation to supervise() below.
 extern "C" bool verifyRollbackLater(){return true;}
 namespace ink {
-constexpr char LAYOUT[]="inkos-ab594-extfs-v2",BOARD[]="xiao-esp32s3-plus-16m",VERSION[]="0.7.5";
+constexpr char LAYOUT[]="inkos-ab594-extfs-v2",BOARD[]="xiao-esp32s3-plus-16m",VERSION[]="0.7.8";
 static std::atomic<uint32_t> beats[3];
 static std::atomic<bool> startup{false},uploading{false},confirmed{false};
 static uint32_t bootId;
@@ -41,7 +42,7 @@ static void supervise(void*){
  auto running=esp_ota_get_running_partition();esp_ota_img_states_t state;bool pending=running&&esp_ota_get_state_partition(running,&state)==ESP_OK&&state==ESP_OTA_IMG_PENDING_VERIFY;
  uint32_t start=millis();
  for(;;){uint32_t now=millis();bool alive=startup&&cjkAssetsHealthy()&&storageHealthy();for(auto&b:beats){auto v=b.load();alive&=v&&now-v<60000;}
- if(!confirmed&&alive&&now-start>=30000){if(!pending||esp_ota_mark_app_valid_cancel_rollback()==ESP_OK){confirmed=true;Serial.println("INKOS OTA healthy; boot confirmed");}}
+ if(!confirmed&&alive&&now-start>=30000){if(!pending||esp_ota_mark_app_valid_cancel_rollback()==ESP_OK){confirmed=true;logf("INKOS OTA healthy; boot confirmed\n");}}
  if(pending&&!confirmed&&now-start>90000){Serial.println("INKOS OTA health failed; reverting");esp_ota_mark_app_invalid_rollback_and_reboot();}
  vTaskDelay(pdMS_TO_TICKS(250));}
 }

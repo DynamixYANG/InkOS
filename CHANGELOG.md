@@ -1,3 +1,29 @@
+# Firmware 0.7.8 / Studio 0.7.4 — Log storage, deletion and retention
+
+- `fs_info`: LittleFS total/used/free, per-category (logs, calendars, energy, other) and per-directory sizes, log budget, and the internal fonts partition.
+- `log_delete` (name or names, `/logs` only, strict name validation). Deleting `current.log` is serialized with the writer.
+- `log_retention_days` (7/21/35/90/180, default 35, NVS `log_ret`): archives older than the retention are pruned at rotation, daily while logging is on, at boot and on setting change, only when the clock is valid. Size safety net: ≤300 archives, 50 % of the space beyond the 512 KiB reserve not used by other data.
+- Removed the experimental USB mass-storage code and `--usb-otg`; USB stays Hardware CDC.
+- Studio 0.7.4: storage bar and capacity estimate with a space-limit warning, retention dropdown, multi-select delete, `--logs-smoke` extended.
+
+# Firmware 0.7.7 / Studio 0.7.3 — Persistent device logs
+
+- Log ring v2: independent USB and flash readers on the 16 KiB non-blocking PSRAM ring, `log_tail`, runtime enable flag.
+- New `log-store` task (core 0, prio 1) writes the ring to `/logs/current.log` on the external LittleFS every 15 s or 8 KiB and rotates at 64 KiB into real ustar+gzip archives `inkos-NNNNNN.tar.gz` (ROM miniz deflate, streamed). Keeps ≤16 archives / 512 KiB and a 512 KiB free-space reserve.
+- `logging_enabled` setting (NVS `log_on`, default on): off makes `logf` a no-op and stops all log flash writes; applied immediately via `logging_set` or `settings_set`; reported in `status`.
+- Commands `log_list`, `log_read`, `log_tail`, `log_rotate`, `log_clear` over USB and paired IP. See [device logs](docs/LOGS.md).
+- Experimental `tools/build.py --usb-otg` image adds a read-only `INKOS_LOGS` USB drive (synthesized FAT12) composite with serial. Not the default: it changes the USB device/COM port and the esptool reset flow.
+- Studio 0.7.3: new Logs page (toggle, file list, .tar.gz viewer, filter, live tail, save, clear) and `--logs-smoke`.
+
+# Firmware 0.7.6 — Faster navigation refresh (experimental)
+
+- Log and report per-phase refresh timing (power-on, setup/SPI transfer, 0x12 waveform, power-off, total) on the `INKOS display` line, in `status` (`display_phase_us`) and `/display`.
+- Keep panel drive power on across a navigation sequence; the settled full refresh or next title reuses it, any other refresh powers off first, and an idle timeout (default 3000 ms) forces power-off.
+- Use the fast OTP full waveform (E0=0x02, E5=0x5A) only for the full refresh that commits a navigation selection. Boot, recovery and maintenance fulls stay standard; every 8th consecutive settled full and the 30-minute maintenance timer use the standard waveform.
+- Send full frames in one SPI burst, drop the redundant post-refresh DTM1 rewrite (N2OCP is set), and replace fixed 2 ms command delays with an edge-driven BUSY wait. SPI stays at 10 MHz.
+- Fix a pre-existing (0.7.x) sticky slowdown: once the 4 KB USB TX buffer filled while USB stayed plugged but no program read the port, every display/network diagnostic `Serial.printf` blocked up to 2 s (HWCDC backpressure), delaying titles and settled pages by many seconds until reboot. Task diagnostics now go to a 16 KiB PSRAM FIFO of whole lines that evicts the oldest lines when full (`status.log_dropped` counts evicted lines, `log_buffered` the retained bytes); the control task drains it without blocking, so a host opening the port later gets the newest retained lines in order. `log_clear` empties it over USB. Command responses are unchanged.
+- New `display_tuning_get` / `display_tuning_set` commands (`hold_power`, `fast_full`, `idle_off_ms`) in separate NVS keys; Studio 0.7.2 remains compatible. Ghosting, low-temperature behaviour and long-held drive power require physical validation.
+
 # Firmware 0.7.5 — Thin rounded weather symbols
 
 - Replace the weather symbol family with pinned Lucide outlines, adapted to thin native 16/24/40/64 px monochrome masks with rounded caps and joins.

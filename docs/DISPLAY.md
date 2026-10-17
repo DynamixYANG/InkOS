@@ -107,3 +107,16 @@ The user rejected the 0.7.3 one-frame waveform: old characters remained visible.
 ### 0.7.5 thin rounded weather symbols
 
 Home and Weather use a unified outlined family adapted from pinned [Lucide sources](../assets/icons/lucide/SOURCE.md), following the user's reference. Native 16/24/40/64 px masks use target strokes of 1/1/1.25/2 px with rounded ends and joins. Original SVGs stay unchanged; the generator strokes them offline at higher resolution, then thresholds once to strictly black/white pixels. The device draws masks directly without scaling, SVG parsing or grey antialiasing. Temperature, precipitation and wind metrics use matching symbols. Text fonts, layout hierarchy and the accepted navigation waveform remain unchanged.
+
+### 0.7.6 experimental faster navigation refresh
+
+`INKOS display` 行新增 `on_us/xfer_us/wave_us/off_us/total_us` 与 `power=held|off|reused-off`，`status` 命令返回 `display_phase_us`。导航标题后面板保持上电，后续标题或选定页全刷直接复用；其他刷新先断电；空闲 `idle_off_ms`（默认 3000 ms）后强制断电。选定页全刷改用快速 OTP 全刷（E0=0x02、E5=0x5A，日志 `wave=otp-fast`），开机、恢复和维护全刷仍为标准 OTP；连续 8 次快速全刷后下一次用标准全刷，30 分钟维护以最后一次标准全刷计时。
+
+调节与回退（USB 或已配对 IP）：
+
+```json
+{"cmd":"display_tuning_get"}
+{"cmd":"display_tuning_set","hold_power":false,"fast_full":false,"idle_off_ms":3000}
+```
+
+残影、低温和长时间保持驱动电压的影响需要实物验收。

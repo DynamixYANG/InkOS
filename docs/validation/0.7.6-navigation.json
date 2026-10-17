@@ -1,0 +1,38 @@
+{
+  "version": "0.7.6",
+  "experimental": true,
+  "install": {
+    "method": "USB serial A/B OTA (ota_begin/ota_chunk/ota_finish), app slot only",
+    "previous": {"version": "0.7.4", "slot": "ota_1", "firmware_sha256": "73dc1f87654398850451a915a7f2af99bd4509cc03737322277aaee98f4f23d0"},
+    "slot": "ota_0",
+    "healthy": true,
+    "firmware_sha256": "db981b88d29b86b0485ce2434585098f6d54bfc0f253581d0c3239228d6aa70f",
+    "nvs_fonts_filesystem_written": false
+  },
+  "baseline_0_7_4": {
+    "title_present_ms": [483, 482, 482, 483, 483, 482],
+    "full_ms": [4166, 4164, 4166, 4165, 4164, 4166],
+    "request_to_committed_ms_median": 4780
+  },
+  "defaults_hold_fast": {
+    "first_title": {"total_ms": 440, "power_on_ms": 130.3, "transfer_ms": 3.6, "waveform_ms": 305.3, "power_off_ms": 0},
+    "consecutive_title": {"total_ms": 309, "power_on_ms": 0, "transfer_ms": 3.6, "waveform_ms": 305.2, "power_off_ms": 0},
+    "settled_fast_full": {"total_ms": 1703, "power_on_ms": 0, "transfer_ms": 83.0, "waveform_ms": 1579.6, "power_off_ms": 40.8},
+    "standard_full_after_8_fast": {"total_ms": 3976, "power_on_ms": 0, "transfer_ms": 83.0, "waveform_ms": 3851.9, "power_off_ms": 40.8},
+    "request_to_committed_ms_median": 2266
+  },
+  "toggles_off_spi_busy_only": {
+    "title": {"total_ms": 480, "power_on_ms": 130.1, "transfer_ms": 3.4, "waveform_ms": 305.4, "power_off_ms": 40.7},
+    "standard_full": {"total_ms": 4106, "power_on_ms": 130.0, "transfer_ms": 83.0, "waveform_ms": 3852.0, "power_off_ms": 40.8}
+  },
+  "idle_timeout": {
+    "page_switch_delay_ms_for_test": 5000,
+    "idle_off_ms": 3000,
+    "held_ms_at_power_off": [3004, 3002],
+    "fast_full_after_idle_ms": [1834, 1833],
+    "settings_restored": true
+  },
+  "body_partial_otp_ms": 1034,
+  "optical_ghosting_pending": true,
+  "low_temperature_pending": true
+}

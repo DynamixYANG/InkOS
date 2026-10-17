@@ -25,7 +25,8 @@ internal static class StudioChecks {
   NetworkChecks.ValidateInputs();
   FirmwareChecks.Validate().GetAwaiter().GetResult();
   ICloudChecks.Validate().GetAwaiter().GetResult();
-  Write("studio-selftest.json",new{passed=12,total=12,firmware_package_and_upload=true,icloud_discovery_and_security=true,navigation_delay_validation=true,encoder_lock_validation=true,firmware_07_compatibility=true,framework="ShadUI 0.2.4 / Avalonia 12.1 / .NET 10"});return 0;
+  LogChecks.Validate();
+  Write("studio-selftest.json",new{passed=14,total=14,device_logs_archive_filter_tail=true,storage_capacity_estimate=true,firmware_package_and_upload=true,icloud_discovery_and_security=true,navigation_delay_validation=true,encoder_lock_validation=true,firmware_07_compatibility=true,framework="ShadUI 0.2.4 / Avalonia 12.1 / .NET 10"});return 0;
  }
  public static async Task<int> DeviceSmokeAsync(){
   using var model=new MainViewModel();await model.ConnectAsync();var device=model.Device;var st=await device.StatusAsync();
@@ -42,7 +43,7 @@ internal static class StudioChecks {
  }
  public static int RenderPreviews(){
   Directory.CreateDirectory("studio-previews");var window=new MainWindow();window.Show();
-  for(int i=0;i<6;i++){
+  for(int i=0;i<7;i++){
    window.SelectSection(i);Dispatcher.UIThread.RunJobs();
    using var bitmap=window.CaptureRenderedFrame()??throw new Exception("Headless renderer produced no frame");
    bitmap.Save($"studio-previews/{i+1}.png",new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
@@ -91,7 +92,25 @@ internal static class StudioChecks {
   var pageScroll=window.FindControl<ScrollViewer>("PageScroll")!;
   pageScroll.Offset=new Avalonia.Vector(0,pageScroll.Extent.Height);Dispatcher.UIThread.RunJobs();
   using(var otaView=window.CaptureRenderedFrame()??throw new Exception("Firmware section render failed"))otaView.Save("studio-previews/network-ota.png",new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
-  Write("studio-ui-check.json",new{passed=true,rendered_pages=6,masked_url_twoway=true,network_inputs_twoway=true,page_delay_twoway=true,encoder_lock_twoway=true,ip_minimum_size=true,energy_input_tax_and_source_bindings=true,sidebar_click=true,minimum_size=new[]{1040,720},button_font=buttonFont,library="ShadUI 0.2.4 (pinned NuGet package)",interactive_window_opened=false,rendering="Avalonia Headless + Skia; real application visual tree"});
+  // Logs view with synthetic data (no device): filter binding and screenshot.
+  window.Width=1160;window.Height=860;window.Model.ConnectionMode=0;window.Model.LoadLogPreview();window.SelectSection(6);pageScroll.Offset=default;Dispatcher.UIThread.RunJobs();
+  pageScroll.Offset=default;Dispatcher.UIThread.RunJobs();pageScroll.Offset=default;Dispatcher.UIThread.RunJobs();
+  using(var logsView=window.CaptureRenderedFrame()??throw new Exception("Logs render failed"))logsView.Save("studio-previews/logs.png",new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
+  var logs=(Views.LogsView)window.FindControl<ContentControl>("PageHost")!.Content!;
+  if(logs.FindControl<Grid>("StorageBar")!.ColumnDefinitions.Count<5||!logs.FindControl<Border>("CapacityWarningBox")!.IsVisible)throw new Exception("Storage bar / 6-month warning not rendered");
+  var fileList=logs.FindControl<ListBox>("LogFileList")!;fileList.Selection.Clear();fileList.Selection.Select(0);fileList.Selection.Select(1);Dispatcher.UIThread.RunJobs();
+  if(window.Model.SelectedLogs.Count!=2||window.Model.DeletePrompt!="Delete 2 selected files? This cannot be undone.")throw new Exception("Multi-select binding failed");
+  if(logs.FindControl<ComboBox>("RetentionInput")!.SelectedIndex!=4)throw new Exception("Retention dropdown binding failed");
+  window.Model.ConfirmDelete=true;
+  pageScroll.Offset=new Avalonia.Vector(0,560);Dispatcher.UIThread.RunJobs();
+  using(var filesView=window.CaptureRenderedFrame()??throw new Exception("Logs files render failed"))filesView.Save("studio-previews/logs-files.png",new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
+  window.Model.ConfirmDelete=false;pageScroll.Offset=new Avalonia.Vector(0,pageScroll.Extent.Height);Dispatcher.UIThread.RunJobs();
+  logs.FindControl<TextBox>("LogFilterInput")!.Text="navigation";Dispatcher.UIThread.RunJobs();
+  if(window.Model.LogText.Split('\n').Any(l=>!l.Contains("navigation"))||!logs.FindControl<TextBox>("LogViewer")!.Text!.Contains("dispatch"))throw new Exception("Log filter binding failed");
+  if(logs.FindControl<ListBox>("LogFileList")!.ItemCount!=3)throw new Exception("Log file list binding failed");
+  using(var filtered=window.CaptureRenderedFrame()??throw new Exception("Logs filter render failed"))filtered.Save("studio-previews/logs-filtered.png",new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
+  window.Model.LogFilter="";
+  Write("studio-ui-check.json",new{passed=true,rendered_pages=7,logs_view=true,logs_filter_binding=true,logs_storage_bar=true,logs_multiselect=true,logs_retention_dropdown=true,masked_url_twoway=true,network_inputs_twoway=true,page_delay_twoway=true,encoder_lock_twoway=true,ip_minimum_size=true,energy_input_tax_and_source_bindings=true,sidebar_click=true,minimum_size=new[]{1040,720},button_font=buttonFont,library="ShadUI 0.2.4 (pinned NuGet package)",interactive_window_opened=false,rendering="Avalonia Headless + Skia; real application visual tree"});
   window.Close();return 0;
  }
  private static void Write(string path,object value)=>File.WriteAllText(path,JsonSerializer.Serialize(value,new JsonSerializerOptions{WriteIndented=true}));

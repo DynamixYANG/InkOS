@@ -11,6 +11,7 @@
      <Button x:Name="Nav3" Classes="nav"  Tag="3" Click="SectionClick"><TextBlock Text="04  Energy" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button>
      <Button x:Name="Nav4" Classes="nav" Tag="4" Click="SectionClick"><TextBlock Text="05  Device" FontFamily="{StaticResource StudioFont}" FontWeight="Normal" FontSize="12"/></Button>
      <Button x:Name="Nav5" Classes="nav" Tag="5" Click="SectionClick"><TextBlock Text="06  Network" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+     <Button x:Name="Nav6" Classes="nav" Tag="6" Click="SectionClick"><TextBlock Text="07  Logs" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
     </StackPanel></ScrollViewer>
     <StackPanel Grid.Row="2" Spacing="12">
      <TextBlock Text="{Binding ConnectionLabel}" Classes="label"/>

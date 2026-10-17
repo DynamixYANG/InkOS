@@ -1,6 +1,9 @@
 #include "Services.h"
 #include "Zones.h"
 #include "CalDav.h"
+#include "Panel.h"
+#include "Log.h"
+#include "LogStore.h"
 #include <Preferences.h>
 #include <esp_timer.h>
 namespace ink {
@@ -18,6 +21,7 @@ static bool writeSettings(const Settings &s) {
   n.end();
   return written == sizeof s;
 }
+static void applyDisplayTuning(const Credentials &c);
 void loadConfiguration() {
   configMutex = xSemaphoreCreateMutex();
   Preferences n;
@@ -46,6 +50,15 @@ void loadConfiguration() {
     config.pageSwitchDelayMs = 500;
   config.encoderLockMs = n.getUInt("encoder_lock", 2000);
   if (config.encoderLockMs > 10000) config.encoderLockMs = 2000;
+  config.navHoldPower = n.getBool("nav_hold", true);
+  config.navFastFull = n.getBool("nav_fast", true);
+  config.loggingEnabled = n.getBool("log_on", true);
+  setLoggingEnabled(config.loggingEnabled);
+  config.logRetentionDays = n.getUShort("log_ret", LogRetentionDefaultDays);
+  if (!validRetentionDays(config.logRetentionDays)) config.logRetentionDays = LogRetentionDefaultDays;
+  setLogRetentionDays(config.logRetentionDays);
+  config.navIdleOffMs = n.getUInt("nav_idle", 3000);
+  if (config.navIdleOffMs < 500 || config.navIdleOffMs > 10000) config.navIdleOffMs = 3000;
   if (n.getBytesLength("settings2") == sizeof(Settings))
     n.getBytes("settings2", &config.settings, sizeof(Settings));
   auto energy = cJSON_Parse(n.getString("energy1", "").c_str());
@@ -94,6 +107,7 @@ void loadConfiguration() {
   model->settings = config.settings;
   model->pageSwitchDelayMs = config.pageSwitchDelayMs;
   model->encoderLockMs = config.encoderLockMs;
+  applyDisplayTuning(config);
   model->energy.enabled = config.energy.enabled;
   model->energy.marginCt = config.energy.marginCt;
   model->energy.vatPercent = config.energy.vatPercent;
@@ -140,6 +154,20 @@ void rotateToken(const String &t) {
   n.putString("refresh", t);
   n.end();
 }
+static void applyDisplayTuning(const Credentials &c) {
+  panel.holdNavigationPower = c.navHoldPower;
+  panel.holdIdleMs = c.navIdleOffMs;
+  panel.fastNavigationFull = c.navFastFull;
+}
+static cJSON *displayTuning(const Credentials &c) {
+  auto out = cJSON_CreateObject();
+  cJSON_AddBoolToObject(out, "inkos", true);
+  cJSON_AddBoolToObject(out, "hold_power", c.navHoldPower);
+  cJSON_AddNumberToObject(out, "idle_off_ms", c.navIdleOffMs);
+  cJSON_AddBoolToObject(out, "fast_full", c.navFastFull);
+  cJSON_AddBoolToObject(out, "panel_held", panel.powerHeld());
+  return out;
+}
 static cJSON *ack(bool ok, const char *message = "") {
   auto j = cJSON_CreateObject();
   cJSON_AddBoolToObject(j, "inkos", true);
@@ -148,6 +176,76 @@ static cJSON *ack(bool ok, const char *message = "") {
   return j;
 }
 cJSON *configurationCommand(const char *cmd, cJSON *j) {
+  if (!strcmp(cmd, "logging_set")) { // Persist + apply without a settings revision/full refresh.
+    auto on = cJSON_GetObjectItem(j, "enabled"), days = cJSON_GetObjectItem(j, "retention_days");
+    if (!on && !days) return ack(false, "Give enabled and/or retention_days");
+    if (on && !cJSON_IsBool(on)) return ack(false, "enabled must be true or false");
+    if (days && (!cJSON_IsNumber(days) || !validRetentionDays(days->valueint) || days->valuedouble != days->valueint))
+      return ack(false, "retention_days must be 7, 21, 35, 90 or 180");
+    Credentials current = credentials();
+    bool enabled = on ? cJSON_IsTrue(on) : current.loggingEnabled;
+    uint16_t retention = days ? uint16_t(days->valueint) : current.logRetentionDays;
+    {
+      Guard g(configMutex);
+      Preferences n;
+      if (!n.begin("inkos", false)) return ack(false, "Could not save logging setting");
+      bool saved = (!on || n.putBool("log_on", enabled) == 1) &&
+                   (!days || n.putUShort("log_ret", retention) == sizeof(uint16_t));
+      n.end();
+      if (!saved) return ack(false, "Could not save logging setting");
+      config.loggingEnabled = enabled;
+      config.logRetentionDays = retention;
+    }
+    if (days) setLogRetentionDays(retention);
+    if (on) applyLoggingEnabled(enabled);
+    auto out = ack(true, "Logging settings saved");
+    cJSON_AddBoolToObject(out, "logging_enabled", loggingEnabled());
+    cJSON_AddNumberToObject(out, "log_retention_days", logRetentionDays());
+    return out;
+  }
+  if (!strcmp(cmd, "logging_get")) {
+    auto out = ack(true, "");
+    cJSON_AddBoolToObject(out, "logging_enabled", loggingEnabled());
+    cJSON_AddNumberToObject(out, "log_retention_days", logRetentionDays());
+    return out;
+  }
+  if (!strcmp(cmd, "display_tuning_get")) return displayTuning(credentials());
+  if (!strcmp(cmd, "display_tuning_set")) {
+    Credentials next = credentials();
+    auto hold = cJSON_GetObjectItem(j, "hold_power"), idle = cJSON_GetObjectItem(j, "idle_off_ms"),
+         fast = cJSON_GetObjectItem(j, "fast_full");
+    if (fast) {
+      if (!cJSON_IsBool(fast)) return ack(false, "fast_full must be true or false");
+      next.navFastFull = cJSON_IsTrue(fast);
+    }
+    if (hold) {
+      if (!cJSON_IsBool(hold)) return ack(false, "hold_power must be true or false");
+      next.navHoldPower = cJSON_IsTrue(hold);
+    }
+    if (idle) {
+      if (!cJSON_IsNumber(idle) || !isfinite(idle->valuedouble) || idle->valuedouble < 500 ||
+          idle->valuedouble > 10000 || idle->valuedouble != idle->valueint)
+        return ack(false, "idle_off_ms must be 500-10000 integer milliseconds");
+      next.navIdleOffMs = idle->valueint;
+    }
+    {
+      Guard g(configMutex);
+      Preferences n;
+      if (!n.begin("inkos", false)) return ack(false, "Could not save display tuning");
+      bool saved = n.putBool("nav_hold", next.navHoldPower) == 1 &&
+                   n.putUInt("nav_idle", next.navIdleOffMs) == sizeof(uint32_t) &&
+                   n.putBool("nav_fast", next.navFastFull) == 1;
+      n.end();
+      if (!saved) return ack(false, "Could not save display tuning");
+      config.navHoldPower = next.navHoldPower;
+      config.navIdleOffMs = next.navIdleOffMs;
+      config.navFastFull = next.navFastFull;
+      applyDisplayTuning(config);
+    }
+    auto out = displayTuning(credentials());
+    cJSON_AddBoolToObject(out, "saved", true);
+    return out;
+  }
   if (!strcmp(cmd,"icloud_get")) {
     auto v=credentials().icloud;auto out=cJSON_CreateObject();cJSON_AddBoolToObject(out,"inkos",true);
     cJSON_AddBoolToObject(out,"enabled",v.enabled);cJSON_AddBoolToObject(out,"has_password",v.password.length()>0);
@@ -343,6 +441,8 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
     cJSON_AddBoolToObject(s, "animations", v.animations);
     cJSON_AddNumberToObject(s, "page_switch_delay_ms", cfg.pageSwitchDelayMs);
     cJSON_AddNumberToObject(s, "encoder_lock_ms", cfg.encoderLockMs);
+    cJSON_AddBoolToObject(s, "logging_enabled", cfg.loggingEnabled);
+    cJSON_AddNumberToObject(s, "log_retention_days", cfg.logRetentionDays);
     cJSON_AddStringToObject(s, "met_contact", v.metContact);
     auto worlds = cJSON_AddArrayToObject(s, "worlds");
     for (auto &w : v.worlds) {
@@ -366,6 +466,8 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
     auto current = credentials();
     Settings v = current.settings;
     uint32_t pageDelay = current.pageSwitchDelayMs, encoderLock = current.encoderLockMs;
+    bool logging = current.loggingEnabled;
+    uint16_t retention = current.logRetentionDays;
     auto s = cJSON_GetObjectItem(j, "settings");
     if (!cJSON_IsObject(s)) {
       return ack(false, "Missing settings");
@@ -385,6 +487,18 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
           lockField->valuedouble != lockField->valueint)
         return ack(false, "Encoder lock must be 0-10000 integer milliseconds");
       encoderLock = lockField->valueint;
+    }
+    auto loggingField = cJSON_GetObjectItem(s, "logging_enabled");
+    if (loggingField) {
+      if (!cJSON_IsBool(loggingField)) return ack(false, "logging_enabled must be true or false");
+      logging = cJSON_IsTrue(loggingField);
+    }
+    auto retentionField = cJSON_GetObjectItem(s, "log_retention_days");
+    if (retentionField) {
+      if (!cJSON_IsNumber(retentionField) || !validRetentionDays(retentionField->valueint) ||
+          retentionField->valuedouble != retentionField->valueint)
+        return ack(false, "log_retention_days must be 7, 21, 35, 90 or 180");
+      retention = uint16_t(retentionField->valueint);
     }
     strlcpy(v.location, stringAt(s, "location"), sizeof v.location);
     strlcpy(v.localZone, stringAt(s, "zone"), sizeof v.localZone);
@@ -436,10 +550,30 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
         n.end();
         if (!saved) return ack(false, "Could not save encoder lock");
       }
+      if (logging != config.loggingEnabled) {
+        Preferences n;
+        if (!n.begin("inkos", false)) return ack(false, "Could not save logging setting");
+        bool saved = n.putBool("log_on", logging) == 1;
+        n.end();
+        if (!saved) return ack(false, "Could not save logging setting");
+      }
+      if (retention != config.logRetentionDays) {
+        Preferences n;
+        if (!n.begin("inkos", false)) return ack(false, "Could not save log retention");
+        bool saved = n.putUShort("log_ret", retention) == sizeof(uint16_t);
+        n.end();
+        if (!saved) return ack(false, "Could not save log retention");
+        config.logRetentionDays = retention;
+      }
       config.encoderLockMs = encoderLock;
       config.settings = v;
       config.pageSwitchDelayMs = pageDelay;
       config.revision++;
+    }
+    if (retention != current.logRetentionDays) setLogRetentionDays(retention);
+    if (logging != current.loggingEnabled) {
+      {Guard g(configMutex); config.loggingEnabled = logging;}
+      applyLoggingEnabled(logging); // Takes effect now; flushes on disable.
     }
     {
       Guard g(modelMutex);
