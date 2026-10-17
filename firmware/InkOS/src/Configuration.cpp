@@ -49,6 +49,7 @@ void loadConfiguration() {
   config.encoderLockMs = n.getUInt("encoder_lock", 2000);
   if (config.encoderLockMs > 10000) config.encoderLockMs = 2000;
   config.navHoldPower = n.getBool("nav_hold", true);
+  config.navFastFull = n.getBool("nav_fast", true);
   config.navIdleOffMs = n.getUInt("nav_idle", 3000);
   if (config.navIdleOffMs < 500 || config.navIdleOffMs > 10000) config.navIdleOffMs = 3000;
   if (n.getBytesLength("settings2") == sizeof(Settings))
@@ -149,12 +150,14 @@ void rotateToken(const String &t) {
 static void applyDisplayTuning(const Credentials &c) {
   panel.holdNavigationPower = c.navHoldPower;
   panel.holdIdleMs = c.navIdleOffMs;
+  panel.fastNavigationFull = c.navFastFull;
 }
 static cJSON *displayTuning(const Credentials &c) {
   auto out = cJSON_CreateObject();
   cJSON_AddBoolToObject(out, "inkos", true);
   cJSON_AddBoolToObject(out, "hold_power", c.navHoldPower);
   cJSON_AddNumberToObject(out, "idle_off_ms", c.navIdleOffMs);
+  cJSON_AddBoolToObject(out, "fast_full", c.navFastFull);
   cJSON_AddBoolToObject(out, "panel_held", panel.powerHeld());
   return out;
 }
@@ -169,7 +172,12 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
   if (!strcmp(cmd, "display_tuning_get")) return displayTuning(credentials());
   if (!strcmp(cmd, "display_tuning_set")) {
     Credentials next = credentials();
-    auto hold = cJSON_GetObjectItem(j, "hold_power"), idle = cJSON_GetObjectItem(j, "idle_off_ms");
+    auto hold = cJSON_GetObjectItem(j, "hold_power"), idle = cJSON_GetObjectItem(j, "idle_off_ms"),
+         fast = cJSON_GetObjectItem(j, "fast_full");
+    if (fast) {
+      if (!cJSON_IsBool(fast)) return ack(false, "fast_full must be true or false");
+      next.navFastFull = cJSON_IsTrue(fast);
+    }
     if (hold) {
       if (!cJSON_IsBool(hold)) return ack(false, "hold_power must be true or false");
       next.navHoldPower = cJSON_IsTrue(hold);
@@ -185,11 +193,13 @@ cJSON *configurationCommand(const char *cmd, cJSON *j) {
       Preferences n;
       if (!n.begin("inkos", false)) return ack(false, "Could not save display tuning");
       bool saved = n.putBool("nav_hold", next.navHoldPower) == 1 &&
-                   n.putUInt("nav_idle", next.navIdleOffMs) == sizeof(uint32_t);
+                   n.putUInt("nav_idle", next.navIdleOffMs) == sizeof(uint32_t) &&
+                   n.putBool("nav_fast", next.navFastFull) == 1;
       n.end();
       if (!saved) return ack(false, "Could not save display tuning");
       config.navHoldPower = next.navHoldPower;
       config.navIdleOffMs = next.navIdleOffMs;
+      config.navFastFull = next.navFastFull;
       applyDisplayTuning(config);
     }
     auto out = displayTuning(credentials());

@@ -84,10 +84,19 @@ void Panel::solid(uint8_t v) {
   for (int y = 0; y < 480; y++)
     data(row, 100);
 }
-void Panel::fullMode() {
+void Panel::fullMode(bool fast) {
   command(0x92);
-  reg(0xE0, 0);
-  reg(0x41, 0);
+  if (fast) {
+    // Fast OTP full update as used by GxEPD2 for UC8179 7.5" panels:
+    // cascade TSFIX + forced temperature 0x5A selects a shorter OTP waveform.
+    // Written right before 0x12; valid with drive power already on.
+    reg(0xE0, 0x02);
+    reg(0xE5, 0x5a);
+  } else {
+    // Standard OTP full update using the internal temperature sensor.
+    reg(0xE0, 0);
+    reg(0x41, 0);
+  }
   reg(0, 0x1f);
   uint8_t v[] = {0x29, 7};
   command(0x50);
@@ -183,9 +192,13 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode, bool sett
   // A navigation preview must never turn into a maintenance full refresh.
   // The settled page immediately follows with a full refresh and resets the budget.
   bool navigation = mode == RefreshMode::Navigation;
+  // Time-based maintenance follows the last *standard* full refresh, so fast
+  // navigation fulls never postpone the strong clean beyond 30 minutes.
   bool full = force || !lastFull || (!navigation &&
               (textPartials >= (mode == RefreshMode::Music ? 32u : 60u) ||
-               animationPartials >= 1200 || (millis() - lastFull > 1800000u)));
+               animationPartials >= 1200 || (millis() - lastStandardFull > 1800000u)));
+  bool fastFull = full && settledNavigation && frames && fastNavigationFull.load() &&
+                  fastFullsSinceStandard < FastFullLimit;
   // A future renderer accidentally changing pixels outside the header must
   // fall back to OTP rather than applying the short waveform to body content.
   bool fastTitle = navigation && !full && navigationWindowAllowed(minx,maxx,miny,maxy);
@@ -200,7 +213,7 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode, bool sett
     return false;
   held = false;
   if (full) {
-    fullMode();
+    fullMode(fastFull);
     if (!frames) {
       // Recover from a physically faded/unknown image before drawing the first page.
       command(0x10);
@@ -223,6 +236,12 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode, bool sett
     fullFrames++;
     lastRegion = {0, 0, 800, 480};
     lastFull = millis();
+    if (fastFull)
+      fastFullsSinceStandard++;
+    else {
+      fastFullsSinceStandard = 0;
+      lastStandardFull = lastFull;
+    }
   } else {
     int x0 = std::max(0, minx - 1) * 8, x1 = std::min(99, maxx + 1) * 8 + 7,
         y0 = std::max(0, miny - 2), y1 = std::min(479, maxy + 2);
@@ -280,7 +299,7 @@ bool Panel::present(const uint8_t *next, bool force, RefreshMode mode, bool sett
                 : mode == RefreshMode::Music ? "music"
                                              : "clock",
                 (unsigned long)lastDuration, (unsigned long)partials, lastRegion.x, lastRegion.y,
-                lastRegion.w, lastRegion.h, fastTitle ? "nav500" : "otp",
+                lastRegion.w, lastRegion.h, fastTitle ? "nav500" : fastFull ? "otp-fast" : "otp",
                 (unsigned long)phases.powerOnUs, (unsigned long)phases.transferUs,
                 (unsigned long)phases.waveformUs, (unsigned long)phases.powerOffUs,
                 (unsigned long)phases.totalUs,
