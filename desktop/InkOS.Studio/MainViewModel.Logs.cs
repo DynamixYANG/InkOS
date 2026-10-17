@@ -5,7 +5,37 @@ using Avalonia.Threading;
 namespace InkOS.Studio;
 public sealed partial class MainViewModel {
  public ObservableCollection<LogFileItem> LogFiles{get;}=[];
+ /// <summary>Bound to the file list's SelectedItems (multi-select).</summary>
+ public ObservableCollection<object> SelectedLogs{get;}=[];
+ private bool storageFirmware;public bool StorageAvailable=>LogsAvailable&&storageFirmware;
+ private StorageInfo? storage;public StorageInfo? Storage{get=>storage;private set{storage=value;Notify();Notify(nameof(StorageSegments));UpdateStorageText();}}
+ public StorageSegment[] StorageSegments=>storage==null?[]:LogStorage.Segments(storage);
+ private string storageSummary="Storage status needs InkOS 0.7.8 or newer.";public string StorageSummary{get=>storageSummary;private set{storageSummary=value;Notify();}}
+ private string storageBreakdown="";public string StorageBreakdown{get=>storageBreakdown;private set{storageBreakdown=value;Notify();}}
+ private string fontsSummary="";public string FontsSummary{get=>fontsSummary;private set{fontsSummary=value;Notify();}}
+ private string capacityText="";public string CapacityText{get=>capacityText;private set{capacityText=value;Notify();}}
+ private string capacityWarning="";public string CapacityWarning{get=>capacityWarning;private set{capacityWarning=value;Notify();Notify(nameof(HasCapacityWarning));}}
+ public bool HasCapacityWarning=>capacityWarning.Length>0;
+ public string[] RetentionLabels=>LogStorage.RetentionLabels;
+ private int retentionDays=35;
+ /// <summary>Dropdown index; changing it sends logging_set retention_days immediately.</summary>
+ public int RetentionIndex{get=>Math.Max(0,Array.IndexOf(LogStorage.RetentionDays,retentionDays));set{if(value<0||value>=LogStorage.RetentionDays.Length||LogStorage.RetentionDays[value]==retentionDays)return;retentionDays=LogStorage.RetentionDays[value];Notify();UpdateStorageText();if(StorageAvailable)SetRetentionCommand.Execute(retentionDays);}}
+ public int LogRetentionDays=>retentionDays;
+ private bool confirmDelete;public bool ConfirmDelete{get=>confirmDelete;set{confirmDelete=value;Notify();Notify(nameof(DeletePrompt));}}
+ public string DeletePrompt=>$"Delete {SelectedLogs.Count} selected file{(SelectedLogs.Count==1?"":"s")}? This cannot be undone.";
+ public StudioCommand DeleteSelectedLogsCommand{get;private set;}=null!;
+ public StudioCommand ConfirmDeleteLogsCommand{get;private set;}=null!;
+ public StudioCommand CancelDeleteLogsCommand{get;private set;}=null!;
+ public StudioCommand SetRetentionCommand{get;private set;}=null!;
  private bool logsFirmware,logPreview;public bool LogsAvailable=>(Connected||logPreview)&&logsFirmware;
+ private void UpdateStorageText(){
+  if(storage is not {} s){StorageSummary="Storage status needs InkOS 0.7.8 or newer.";StorageBreakdown=FontsSummary=CapacityText=CapacityWarning="";return;}
+  StorageSummary=$"LittleFS {LogArchive.Size(s.Used)} used of {LogArchive.Size(s.Total)} · {LogArchive.Size(s.Free)} free · {LogArchive.Size(s.Reserve)} always kept free";
+  StorageBreakdown=$"Logs {LogArchive.Size(s.Logs)} ({s.ArchiveCount} archive{(s.ArchiveCount==1?"":"s")} {LogArchive.Size(s.ArchiveBytes)} + current.log {LogArchive.Size(s.CurrentBytes)}) · Calendars {LogArchive.Size(s.Calendars)} · Energy {LogArchive.Size(s.Energy)} · Other + filesystem {LogArchive.Size(s.Other+s.Overhead)}";
+  FontsSummary=$"Fonts / assets: {LogArchive.Size(s.FontsUsed)} of the {LogArchive.Size(s.FontsPartition)} internal-flash fonts partition (not on LittleFS).";
+  var e=LogStorage.Estimate(s,retentionDays);CapacityText=e.Text+(s.ClockValid?"":" · clock not set: no age-based deletion yet");
+  CapacityWarning=e.Warn?$"Space limit will remove older logs first: about {e.DaysFit:0} days fit, retention is {retentionDays} days.":"";
+ }
  private bool loggingEnabled=true;
  /// <summary>Bound to the device NVS setting; changing it sends logging_set (no settings revision).</summary>
  public bool LoggingEnabled{get=>loggingEnabled;set{if(loggingEnabled==value)return;loggingEnabled=value;Notify();if(LogsAvailable)SetLoggingCommand.Execute(value);}}
@@ -34,13 +64,21 @@ public sealed partial class MainViewModel {
   CancelClearLogsCommand=new(_=>{ConfirmClear=false;return Task.CompletedTask;});
   SetLoggingCommand=new(p=>RunAsync(()=>SetLoggingAsync(p is true)),()=>LogsAvailable);
   TailOnceCommand=new(_=>RunAsync(()=>TailAsync(true)),()=>!busy&&LogsAvailable);
-  return [RefreshLogsCommand,OpenLogCommand,ClearLogsCommand,ConfirmClearLogsCommand,SetLoggingCommand,TailOnceCommand];
+  DeleteSelectedLogsCommand=new(_=>{if(SelectedLogs.Count>0)ConfirmDelete=true;return Task.CompletedTask;},()=>!busy&&LogsAvailable);
+  ConfirmDeleteLogsCommand=new(_=>RunAsync(DeleteSelectedLogsAsync),()=>!busy&&LogsAvailable);
+  CancelDeleteLogsCommand=new(_=>{ConfirmDelete=false;return Task.CompletedTask;});
+  SetRetentionCommand=new(p=>RunAsync(()=>SetRetentionAsync((int)p!)),()=>StorageAvailable);
+  SelectedLogs.CollectionChanged+=(_,_)=>{Notify(nameof(DeletePrompt));if(SelectedLogs.Count==0)ConfirmDelete=false;};
+  return [DeleteSelectedLogsCommand,ConfirmDeleteLogsCommand,SetRetentionCommand,RefreshLogsCommand,OpenLogCommand,ClearLogsCommand,ConfirmClearLogsCommand,SetLoggingCommand,TailOnceCommand];
  }
  /// <summary>Called after a successful connect; older firmware has no log commands.</summary>
  private async Task DetectLogsAsync(JsonElement status){
   logsFirmware=status.TryGetProperty("logging_enabled",out var on)&&on.ValueKind is JsonValueKind.True or JsonValueKind.False;
   if(logsFirmware){loggingEnabled=on.GetBoolean();Notify(nameof(LoggingEnabled));}
   else{LogFiles.Clear();LogSummary="This firmware has no persistent logs (InkOS 0.7.7 or newer).";}
+  storageFirmware=status.TryGetProperty("log_retention_days",out var days)&&days.ValueKind==JsonValueKind.Number;
+  if(storageFirmware){retentionDays=days.GetInt32();Notify(nameof(RetentionIndex));}else Storage=null;
+  Notify(nameof(StorageAvailable));
   Notify(nameof(LogsAvailable));
   if(logsFirmware)await RefreshLogsAsync(true);
  }
@@ -51,16 +89,18 @@ public sealed partial class MainViewModel {
   string? keep=SelectedLog?.Name;LogFiles.Clear();
   foreach(var f in v.GetProperty("files").EnumerateArray())
    LogFiles.Add(new(f.GetProperty("name").GetString()!,f.GetProperty("size").GetInt64(),f.GetProperty("mtime").GetInt64()));
+  SelectedLogs.Clear();
   SelectedLog=LogFiles.FirstOrDefault(f=>f.Name==keep)??LogFiles.LastOrDefault();
   long total=LogFiles.Sum(f=>f.Size);
   string free=v.TryGetProperty("fs_free_bytes",out var fb)?LogArchive.Size(fb.GetInt64()):"?";
   LogSummary=$"{(loggingEnabled?"LOGGING ON":"LOGGING OFF")} · {LogFiles.Count} files · {LogArchive.Size(total)} · RAM ring {LogArchive.Size(v.GetProperty("ring_bytes").GetInt64())} · "+
    $"rotations {v.GetProperty("rotations").GetInt64()} · dropped USB {v.GetProperty("dropped").GetInt64()} / file {v.GetProperty("file_dropped").GetInt64()} · free {free}"+
    (v.TryGetProperty("host_active",out var h)&&h.GetBoolean()?" · USB disk mounted (rotation paused)":"");
+  if(storageFirmware)Storage=StorageInfo.Parse(await Device.FsInfoAsync());
   if(!quiet)Status="LOGS / File list refreshed.";
  }
  public async Task OpenSelectedLogAsync(){
-  var file=SelectedLog??throw new InvalidOperationException("Choose a log file first.");
+  var file=SelectedLogs.OfType<LogFileItem>().LastOrDefault()??SelectedLog??throw new InvalidOperationException("Choose a log file first.");
   var sw=System.Diagnostics.Stopwatch.StartNew();
   var bytes=await Device.LogReadFileAsync(file.Name,(done,size)=>LogTitle=$"{file.Name} / {done*100/Math.Max(1,size)}%");
   string text;
@@ -76,11 +116,24 @@ public sealed partial class MainViewModel {
   await File.WriteAllBytesAsync(path,openedBytes);Status=$"LOGS / Saved {openedName} to {path}.";
  }
  public string SuggestedLogFileName=>openedName??"inkos.log";
- private async Task ClearLogsAsync(){
+ internal async Task ClearLogsAsync(){
   ConfirmClear=false;
   await Device.LogClearAsync();
   openedBytes=null;openedName=null;Notify(nameof(CanSaveLog));logSource="";tailLines=[];ApplyLogFilter();LogTitle="NO FILE OPEN";
   await Task.Delay(400);await RefreshLogsAsync(true);Status="LOGS / Device logs cleared.";
+ }
+ internal async Task DeleteSelectedLogsAsync(){
+  ConfirmDelete=false;
+  var names=SelectedLogs.OfType<LogFileItem>().Select(f=>f.Name).Distinct().ToArray();
+  if(names.Length==0)throw new InvalidOperationException("Select log files first.");
+  var (deleted,missing)=await Device.LogDeleteAsync(names);
+  if(openedName!=null&&deleted.Contains(openedName)){openedBytes=null;openedName=null;Notify(nameof(CanSaveLog));}
+  await RefreshLogsAsync(true);
+  Status=$"LOGS / Deleted {deleted.Length} file{(deleted.Length==1?"":"s")}{(missing.Length>0?$", {missing.Length} already gone":"")}.";
+ }
+ internal async Task SetRetentionAsync(int days){
+  retentionDays=await Device.SetLogRetentionAsync(days);Notify(nameof(RetentionIndex));
+  await RefreshLogsAsync(true);Status=$"LOGS / Retention set to {LogStorage.RetentionLabels[Array.IndexOf(LogStorage.RetentionDays,retentionDays)]}.";
  }
  private async Task SetLoggingAsync(bool on){
   var v=await Device.SetLoggingAsync(on);
@@ -113,6 +166,10 @@ public sealed partial class MainViewModel {
   long t=DateTimeOffset.Parse("2026-10-17T20:24:00Z").ToUnixTimeSeconds();
   LogFiles.Add(new("inkos-000001.tar.gz",599,t));LogFiles.Add(new("inkos-000002.tar.gz",6864,t+319));LogFiles.Add(new("current.log",26099,t+420));
   SelectedLog=LogFiles[1];
+  storageFirmware=true;retentionDays=180;Notify(nameof(RetentionIndex));
+  Storage=new StorageInfo{Total=4194304,Used=86016,Free=4108288,Reserve=524288,Block=4096,Logs=33562,LogFiles=3,Calendars=38457,Energy=1676,
+   CurrentBytes=26099,ArchiveBytes=7463,ArchiveCount=2,Budget=1804288,MaxFiles=300,RotateBytes=65536,OldestArchive=t,NewestArchive=t+319,RetentionDays=180,ClockValid=true,FontsPartition=4194304,FontsUsed=4185866};
+
   LogSummary="LOGGING ON · 3 files · 32.8 KB · RAM ring 15.9 KB · rotations 2 · dropped USB 506 / file 0 · free 3.93 MB";
   logSource=string.Join('\n',new[]{
    "INKOS boot version=0.7.7 reset=3","INKOS WiFi online","INKOS navigation dispatch page=1 sequence=260 age_us=158876",

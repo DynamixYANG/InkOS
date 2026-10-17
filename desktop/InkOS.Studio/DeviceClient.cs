@@ -41,6 +41,19 @@ public sealed class DeviceClient:IDisposable {
   var v=await SendAsync(new{cmd="log_clear",files=true},x=>x.TryGetProperty("ok",out _)&&!x.TryGetProperty("files",out _)&&!x.TryGetProperty("data",out _));
   if(!v.GetProperty("ok").GetBoolean())throw new InvalidOperationException(v.TryGetProperty("message",out var m)?m.GetString():"The screen could not clear its logs.");
  }
+ public Task<JsonElement> FsInfoAsync()=>SendAsync(new{cmd="fs_info"},v=>v.TryGetProperty("littlefs",out _)||v.TryGetProperty("ok",out var ok)&&ok.ValueKind==JsonValueKind.False);
+ /// <summary>Deletes /logs files by bare name; the device validates names again.</summary>
+ public async Task<(string[] deleted,string[] missing)> LogDeleteAsync(IReadOnlyCollection<string> names){
+  var v=await SendAsync(new{cmd="log_delete",names},x=>x.TryGetProperty("deleted",out _)||x.TryGetProperty("ok",out var ok)&&ok.ValueKind==JsonValueKind.False);
+  if(!v.GetProperty("ok").GetBoolean())throw new InvalidOperationException(v.TryGetProperty("message",out var m)?m.GetString():"The screen could not delete the log files.");
+  static string[] List(JsonElement a)=>a.EnumerateArray().Select(e=>e.GetString()??"").ToArray();
+  return (List(v.GetProperty("deleted")),List(v.GetProperty("missing")));
+ }
+ public async Task<int> SetLogRetentionAsync(int days){
+  var v=await SendAsync(new{cmd="logging_set",retention_days=days},x=>x.TryGetProperty("log_retention_days",out _)||x.TryGetProperty("saved",out _));
+  if(v.TryGetProperty("saved",out var s)&&!s.GetBoolean())throw new InvalidOperationException(v.TryGetProperty("message",out var m)?m.GetString():"The screen could not change log retention.");
+  return v.GetProperty("log_retention_days").GetInt32();
+ }
  public async Task<bool> SetLoggingAsync(bool enabled){
   var v=await SendAsync(new{cmd="logging_set",enabled},x=>x.TryGetProperty("logging_enabled",out _)||x.TryGetProperty("saved",out _));
   if(v.TryGetProperty("saved",out var s)&&!s.GetBoolean())throw new InvalidOperationException(v.TryGetProperty("message",out var m)?m.GetString():"The screen could not change logging.");
