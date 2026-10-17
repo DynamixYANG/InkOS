@@ -1,3 +1,11 @@
+# Firmware 0.7.6 — Faster navigation refresh (experimental)
+
+- Log and report per-phase refresh timing (power-on, setup/SPI transfer, 0x12 waveform, power-off, total) on the `INKOS display` line, in `status` (`display_phase_us`) and `/display`.
+- Keep panel drive power on across a navigation sequence; the settled full refresh or next title reuses it, any other refresh powers off first, and an idle timeout (default 3000 ms) forces power-off.
+- Use the fast OTP full waveform (E0=0x02, E5=0x5A) only for the full refresh that commits a navigation selection. Boot, recovery and maintenance fulls stay standard; every 8th consecutive settled full and the 30-minute maintenance timer use the standard waveform.
+- Send full frames in one SPI burst, drop the redundant post-refresh DTM1 rewrite (N2OCP is set), and replace fixed 2 ms command delays with an edge-driven BUSY wait. SPI stays at 10 MHz.
+- New `display_tuning_get` / `display_tuning_set` commands (`hold_power`, `fast_full`, `idle_off_ms`) in separate NVS keys; Studio 0.7.2 remains compatible. Ghosting, low-temperature behaviour and long-held drive power require physical validation.
+
 # Firmware 0.7.5 — Thin rounded weather symbols
 
 - Replace the weather symbol family with pinned Lucide outlines, adapted to thin native 16/24/40/64 px monochrome masks with rounded caps and joins.
