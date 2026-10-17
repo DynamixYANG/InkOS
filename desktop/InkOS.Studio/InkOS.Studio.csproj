@@ -5,7 +5,7 @@
   <PathMap>$(MSBuildProjectDirectory)=/_/InkOS.Studio</PathMap>
   <DebugType>embedded</DebugType>
   <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
-  <AssemblyName>InkOS Studio</AssemblyName><Version>0.7.2</Version>
+  <AssemblyName>InkOS Studio</AssemblyName><Version>0.7.3</Version>
   <ApplicationManifest>app.manifest</ApplicationManifest>
   <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
   <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>

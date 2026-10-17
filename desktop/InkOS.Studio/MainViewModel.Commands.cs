@@ -27,7 +27,8 @@ public sealed partial class MainViewModel {
   InitializeNetworkCommands();
   InitializeFirmwareCommands();
   InitializeICloudCommands();
-  commands=[DiscoverICloudCommand,SaveICloudCommand,DisconnectICloudCommand,UpgradeFirmwareCommand,SaveWifiCommand,PairNetworkCommand,DisableNetworkCommand,ConnectCommand,RefreshPortsCommand,SaveCommand,NavigateCommand,AuthorizeCommand,CancelAuthorizationCommand,DisconnectSpotifyCommand,OpenLinkCommand];
+  var logCommands=InitializeLogCommands();
+  commands=[..logCommands,DiscoverICloudCommand,SaveICloudCommand,DisconnectICloudCommand,UpgradeFirmwareCommand,SaveWifiCommand,PairNetworkCommand,DisableNetworkCommand,ConnectCommand,RefreshPortsCommand,SaveCommand,NavigateCommand,AuthorizeCommand,CancelAuthorizationCommand,DisconnectSpotifyCommand,OpenLinkCommand];
  }
  private async Task RunAsync(Func<Task> work){
   if(busy)return;busy=true;RefreshCommands();
@@ -36,5 +37,5 @@ public sealed partial class MainViewModel {
   catch(Exception ex){Status=ex is InvalidOperationException or TimeoutException?ex.Message:"The operation failed. Check USB, the network and app settings.";}
   finally{authorization?.Dispose();authorization=null;busy=false;RefreshCommands();}
  }
- private void RefreshCommands(){Notify(nameof(IsBusy));Notify(nameof(CanChooseFirmware));Notify(nameof(Connected));Notify(nameof(ConnectionLabel));foreach(var c in commands)c.Refresh();}
+ private void RefreshCommands(){Notify(nameof(IsBusy));Notify(nameof(LogsAvailable));Notify(nameof(CanSaveLog));Notify(nameof(CanChooseFirmware));Notify(nameof(Connected));Notify(nameof(ConnectionLabel));foreach(var c in commands)c.Refresh();}
 }

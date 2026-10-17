@@ -34,7 +34,7 @@ public sealed partial class MainViewModel:INotifyPropertyChanged,IDisposable {
    icloudFirmware=Version.Parse(ver.GetString()!).Minor>=7;
    modernFirmware=!ver.GetString()!.StartsWith("0.3.");
    if(UseUsb&&v.TryGetProperty("ip",out var ip))NetworkAddress=ip.GetString()??"";
-   await ReloadAsync();deviceValidated=true;Status=$"CONNECTED / {(UseNetwork?NetworkAddress:SelectedPort)} / InkOS {ver.GetString()}";
+   await ReloadAsync();deviceValidated=true;await DetectLogsAsync(v);Status=$"CONNECTED / {(UseNetwork?NetworkAddress:SelectedPort)} / InkOS {ver.GetString()}";
   }
   catch{Device.Dispose();throw;}
   finally{Notify(nameof(Connected));Notify(nameof(ConnectionLabel));}
@@ -65,5 +65,5 @@ public sealed partial class MainViewModel:INotifyPropertyChanged,IDisposable {
  public async Task AuthorizeAsync(string clientId,CancellationToken ct){Status="Authorize in your browser, then return here.";string token=await SpotifyAuthorization.AuthorizeAsync(clientId.Trim(),ct);await Device.SaveAsync(new{cmd="spotify",client_id=clientId.Trim(),refresh_token=token});SpotifyStatus="Authorization saved; start music on your phone or speaker.";Status="SPOTIFY / Saved directly to the screen.";}
  public async Task DisconnectSpotifyAsync(){await Device.SaveAsync(new{cmd="spotify_disconnect"});SpotifyStatus="Account disconnected from this screen";Status="SPOTIFY / Device credentials removed.";}
  public void ApplyPlace(Place p){Settings.location=p.Name;Settings.latitude=p.Latitude;Settings.longitude=p.Longitude;Settings.zone=p.Zone;LatitudeText=p.Latitude.ToString(System.Globalization.CultureInfo.InvariantCulture);LongitudeText=p.Longitude.ToString(System.Globalization.CultureInfo.InvariantCulture);Notify(nameof(Settings));Notify(nameof(LatitudeText));Notify(nameof(LongitudeText));}
- public void Dispose(){authorization?.Cancel();authorization?.Dispose();Device.Dispose();}
+ public void Dispose(){LiveTail=false;authorization?.Cancel();authorization?.Dispose();Device.Dispose();}
 }

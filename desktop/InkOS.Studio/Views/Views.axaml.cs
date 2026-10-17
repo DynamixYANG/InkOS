@@ -18,3 +18,11 @@ public partial class PlaceView:UserControl {
  public PlaceView()=>InitializeComponent();
  private void PlaceChanged(object? sender,SelectionChangedEventArgs e){if(DataContext is MainViewModel model&&sender is ComboBox{SelectedItem:Place place})model.ApplyPlace(place);}
 }
+public partial class LogsView:UserControl {
+ public LogsView()=>InitializeComponent();
+ private async void SaveLog(object? sender,Avalonia.Interactivity.RoutedEventArgs e){
+  if(DataContext is not MainViewModel model||TopLevel.GetTopLevel(this) is not { } top)return;
+  var file=await top.StorageProvider.SaveFilePickerAsync(new(){Title="Save InkOS log",SuggestedFileName=model.SuggestedLogFileName});
+  if(file?.TryGetLocalPath() is {} path){try{await model.SaveOpenedLogAsync(path);}catch(Exception ex){model.Status=ex is InvalidOperationException or IOException or UnauthorizedAccessException?ex.Message:"Could not save the log file.";}}
+ }
+}
