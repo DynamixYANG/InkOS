@@ -1,0 +1,53 @@
+flowchart TB
+  subgraph HW["输入 / ISR"]
+    ENC["编码器 GPIO41/42<br/>CHANGE 中断 · 满一格通知"]
+    BTN["按键 KEY1/2/3<br/>(input 任务轮询去抖)"]
+  end
+  subgraph PER["外设"]
+    EPD["UC8179 800×480<br/>HSPI 10 MHz · BUSY 边沿等待<br/>保持上电 hold_power · 快速全刷 fast_full"]
+    USB["USB Hardware CDC<br/>4 KB TX 缓冲 (303A:1001)"]
+    EXT[("外部 4 MiB SPI Flash<br/>LittleFS /inkstore<br/>日历/电价缓存 · /logs")]
+  end
+
+  subgraph C1["Core 1"]
+    IN["input 任务<br/>prio 3 · 3 KB<br/>ulTaskNotifyTake ≤10 ms"]
+    DISP["display 任务<br/>prio 2 · 12 KB<br/>唯一的 SPI/Panel 使用者"]
+    CTRL["control 任务<br/>prio 1 · 12 KB<br/>HTTP:80 + USB 命令<br/>非阻塞排空日志 (仅 TX 近空时写)"]
+  end
+
+  subgraph C0["Core 0"]
+    NET["network 任务<br/>prio 1 · 16 KB<br/>Wi-Fi/NTP · 天气/日历/电价/Spotify/歌词"]
+    LOGW["log-store 任务 (0.7.7+)<br/>prio 1 · 12 KB<br/>15 s 或 8 KB 落盘 · 64 KiB 轮转 tar.gz<br/>保留期/容量裁剪"]
+    OTA["ota-health 任务<br/>prio 1 · 4 KB<br/>心跳监控 / 回滚"]
+  end
+
+  subgraph SYNC["共享状态与同步"]
+    MODEL[("Model ≈99 KB (PSRAM)<br/>modelMutex")]
+    Q[["displayEvents<br/>队列长度 1 · xQueueOverwrite"]]
+    FM{{"frameMutex<br/>(present / frame.pbm)"}}
+    RING[("日志环 16 KiB PSRAM<br/>整行 FIFO · 满则淘汰最旧<br/>portMUX 自旋锁 · 两个读指针")]
+    FSL{{"fsLock<br/>(LittleFS 日志操作)"}}
+  end
+
+  ENC -- "vTaskNotifyGiveFromISR" --> IN
+  BTN --> IN
+  IN -- "navigatePage()<br/>revision++" --> MODEL
+  CTRL -- "HTTP/USB 切页、配置" --> MODEL
+  NET -- "数据发布" --> MODEL
+  MODEL -- "invalidate()" --> Q
+  Q -- "唤醒" --> DISP
+  DISP -- "快照 + 渲染" --> MODEL
+  DISP --> FM --> EPD
+
+  DISP -. "logf() 从不阻塞" .-> RING
+  NET -. "logf()" .-> RING
+  CTRL -. "logf()" .-> RING
+  RING -- "USB 读指针" --> CTRL --> USB
+  RING -- "文件读指针 · 8 KB 通知" --> LOGW
+  LOGW --> FSL --> EXT
+  CTRL -- "log_* / fs_info 命令" --> FSL
+  NET --> EXT
+
+  DISP -. "心跳 0" .-> OTA
+  NET -. "心跳 1" .-> OTA
+  CTRL -. "心跳 2" .-> OTA

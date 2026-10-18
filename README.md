@@ -2,13 +2,13 @@
 
 ESP32 独立运行的 7.5 英寸黑白墨水屏桌面看板，配套 C# ShadUI 设置应用。
 
-[English](README.en.md) · [完整文档](docs/README.md) · [下载 Releases](https://github.com/DynamixYANG/InkOS/releases) · [MIT License](LICENSE)
+[English](README.en.md) · [完整文档](docs/README.md) · [交接说明](docs/HANDOVER.md) · [下载 Releases](https://github.com/DynamixYANG/InkOS/releases) · [MIT License](LICENSE)
 
 ![InkOS Home](docs/images/calendar/home-weeks.png)
 
 0.4.1 正式绘图器生成的合成示例，不含私人日程。
 
-**固件 0.7.2 / Studio 0.7.2**。设备基于 ESP32 Arduino 内置 FreeRTOS，自行联网、计算、绘图和刷新。电脑只用于烧录、修改设置及 Spotify 的一次性授权，日常运行无需常驻服务器。切页先局刷标题、停按后再全刷，等待时间在 Studio 中设置（默认 0.5 秒）。
+**固件 0.7.8 / Studio 0.7.4**。设备基于 ESP32 Arduino 内置 FreeRTOS，自行联网、计算、绘图和刷新。电脑只用于烧录、修改设置及 Spotify 的一次性授权，日常运行无需常驻服务器。切页先局刷标题（连续切页约 0.31 秒），停按后快速全刷整页（约 1.7 秒），等待时间在 Studio 中设置（默认 0.5 秒）。设备在外部 Flash 上保存可轮转的诊断日志，可在 Studio 的 Logs 页查看。
 
 ## 功能
 
@@ -32,7 +32,7 @@ KEY1 上一页，KEY2 下一页，KEY3 主页，七页循环切换。默认地�
 
 字体采用 Terminus 原生点阵与 IBM Plex Mono Light，按原生尺寸输出 1-bit 像素。小字体保持一像素笔画，不做运行时缩放或灰度抗锯齿。中文使用思源黑体 Source Han Sans SC Light 的离线单色字模，按字宽自动混排。
 
-当前版本优先保证对比度：使用面板工厂 OTP 波形，分钟级时钟局刷；高频图标动画和冒号闪烁默认关闭。此前短波形快刷出现静态文字变淡和背景变脏，已移除。详见 [显示与字体](docs/DISPLAY.md)。
+当前版本优先保证对比度：使用面板工厂 OTP 波形，分钟级时钟局刷；高频图标动画和冒号闪烁默认关闭。此前短波形快刷出现静态文字变淡和背景变脏，已移除。0.7.6 起切页期间保持面板上电，选定页使用快速 OTP 全刷：连续标题 483 → 309 ms，整页 4172 → 1703 ms（实测），每 8 次快速全刷后插入一次标准全刷；两项均可用 `display_tuning_set` 关闭。详见 [显示与字体](docs/DISPLAY.md)。
 
 ## 快速开始
 
@@ -43,6 +43,12 @@ KEY1 上一页，KEY2 下一页，KEY3 主页，七页循环切换。默认地�
 5. 需要无线配置时，在 Network 通过 USB 启用配对密钥，再选 IP / Network 连接。完成后关闭上位机；屏幕自行工作。
 
 ![InkOS Studio](docs/images/studio/2.png)
+
+## 设备日志
+
+诊断日志先写入 16 KiB 内存环形缓冲，写入方从不阻塞；后台任务每 15 秒写入外部 LittleFS，满 64 KiB 压缩为 `.tar.gz` 归档。保留期可选 1 周至 6 个月（默认 35 天），空间上限始终生效，按当前速率约可保存 42 天。Studio 0.7.4 的 Logs 页显示存储用量与容量估算，可查看、过滤、实时尾随、保存、多选删除和清空日志。USB 仍为普通串口，不提供 U 盘模式。见 [设备日志](docs/LOGS.md)。
+
+![Studio Logs](docs/images/studio/logs.png)
 
 ## 日历、Spotify 和电价
 
@@ -80,6 +86,22 @@ InkOS/
 └── out/                 本地生成，Git 忽略，不上传原始设备数据
 ```
 
+## 架构
+
+FreeRTOS 任务分布在两个核心：input、display、control 在 core 1，network、log-store、ota-health 在 core 0。Model 与日志环位于 PSRAM，面板只由 display 任务访问。图表的 mermaid 源文件与 PNG 都在 [docs/images/architecture](docs/images/architecture/)；设计、根因分析、操作与待验证项见 [交接说明](docs/HANDOVER.md) 和 [系统架构](docs/ARCHITECTURE.md)。
+
+![架构](docs/images/architecture/1-architecture.png)
+
+切页时序（[源文件](docs/images/architecture/2-page-switch-sequence.mmd)）：
+
+![切页时序](docs/images/architecture/2-page-switch-sequence.png)
+
+刷新时间线，0.7.4 对比 0.7.8（[标题](docs/images/architecture/3-refresh-timeline.mmd)、[全刷](docs/images/architecture/4-full-refresh-timeline.mmd)）：
+
+![标题时间线](docs/images/architecture/3-refresh-timeline.png)
+
+![全刷时间线](docs/images/architecture/4-full-refresh-timeline.png)
+
 ## 开发
 
 Python 3.11+、Arduino CLI + ESP32 core **3.3.12**、.NET **10 SDK**。
@@ -104,5 +126,7 @@ dotnet build desktop/InkOS.Studio/InkOS.Studio.csproj -c Release --no-restore
 Google 私密订阅与 Spotify 账号授权已实机验证；每位使用者仍需配置自己的账号。支持 28 个显式时区、最多三个日历源、96 条展开事项、35 天日程窗口。中文字库采用思源黑体 Light，支持基本多文种平面的简繁体汉字及中文标点，可显示中文歌曲、歌词和日程；Emoji 与补充平面少见字暂未覆盖。0.6 使用两个 5.9375 MiB OTA 应用槽、内部共享压缩字库和外部 LittleFS。完整记录见 [VALIDATION](docs/VALIDATION.md)。
 
 原创代码采用 [MIT](LICENSE)；第三方字体、SunCalc、uICAL 和桌面依赖保留各自许可证。MIT 不替代天气、音乐、歌词和电价服务的数据使用条款。见 [第三方说明](docs/THIRD_PARTY.md)。
+
+0.7.6–0.7.8 经 USB A/B OTA 安装并确认健康；Studio 自检 14/14，实机日志冒烟测试通过，日志开关与保留期重启后保持。快速全刷的长期残影和低温表现尚待实物验证，见 [交接说明](docs/HANDOVER.md#8-待办与实物验证清单)。
 
 远程升级：见 [OTA、A/B 分区和外部 Flash](docs/OTA.md)。0.6 分区与文件系统迁移需要 USB，之后可在 Studio 的 Network → Firmware 中通过已配对 IP 升级。

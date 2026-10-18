@@ -1,3 +1,34 @@
+# 固件 0.7.8 / Studio 0.7.4 — 日志存储、删除与保留期
+
+- 新命令 `fs_info`：LittleFS 总量／已用／空闲、块大小、保留余量；按类别（logs、calendars、energy、other）和顶层目录统计字节与文件数；日志预算、归档数量与时间范围；内部字库分区占用。一次遍历小目录树，在日志锁内完成。
+- 新命令 `log_delete`：参数 `name` 或 `names[]`（≤64），只允许 `/logs/` 下的 `current.log` 与 `inkos-NNNNNN.tar.gz`；任一名称含 `..`、其他目录或其他文件则整批拒绝，先校验后删除，返回 `deleted[]` 与 `missing[]`。删除 `current.log` 持有写入任务的锁，不会与落盘或轮转竞争；下一次落盘自动重建。
+- 新设置 `log_retention_days`（7/21/35/90/180 天，默认 **35**，NVS `log_ret`）：经 `logging_set`、`settings_get/set`（可选字段）和 `status` 读写，立即生效。早于保留期的归档按轮转时间删除；时钟未经 NTP 校准时绝不按时间删除。
+- 裁剪时机：开机、每次轮转、设置变更，以及日志开启且时钟有效时每天一次；关闭日志时写入任务无周期唤醒。容量兜底依次为：最多 300 个归档、预算 = 50 % ×（LittleFS − 512 KiB 余量 − 非日志数据，至少 256 KiB）、始终保留 512 KiB 空闲；最旧的先删。规则独立为 `LogPolicy`，用伪时钟做主机测试。
+- 实测：LittleFS 4,194,304 B（4 KiB 块），清空日志后已用 61,440 B；字库在内部分区，占 4,185,866 / 4,194,304 B；归档预算 1,804,288 B。空闲时约 350 KB/天原始日志，压缩后约 36 KB/天，约可保存 **42 天**；3 个月和 6 个月超出容量，此时由空间上限先删旧日志。
+- 移除实验性 USB 大容量存储（`INKOS_LOGS` 盘、虚拟 FAT）和 `tools/build.py --usb-otg`；USB 保持 Hardware CDC，COM 口和 esptool 复位流程不变。
+- 写入任务栈增至 12 KiB；列表与裁剪工作区放在 PSRAM。
+- Studio 0.7.4：Logs 页新增 LittleFS 用量条（日志／日历／电价／其他／空闲／余量）、字库分区、容量估算和“space limit will remove older logs first”提示、保留期下拉框（立即应用）、多选 **Delete selected…**（行内确认），保留 **Clear all**。`--logs-smoke` 扩展为：设置并恢复保留期、`log_rotate` 三次后核对 `fs_info`、设备端路径校验、删除所选、删除 `current.log`、清空；全程不发送 `settings_set`。
+- 验证：主机测试通过；Studio 自检 14/14；COM9 实机 `--logs-smoke` 通过；`logging_enabled` 与保留期重启两次后保持。经 USB A/B OTA 安装到 ota_1，0.7.7c 保留在 ota_0。
+
+# 固件 0.7.7 / Studio 0.7.3 — 设备持久日志
+
+- 日志环 v2：16 KiB PSRAM 整行 FIFO，写入方从不阻塞；USB 与文件两个读指针各自独立计数丢失行；新增 `log_tail` 和运行时开关。
+- 新 `log-store` 任务（core 0，优先级 1）每 15 s 或积累 8 KiB 时把日志写入外部 LittleFS 的 `/logs/current.log`；达到 64 KiB 后流式压缩为标准 ustar + gzip 归档 `inkos-NNNNNN.tar.gz`（ROM miniz deflate）。实测 66,404 → 6,864 B（10.3 %），在 core 0 用时 297 ms，期间标题与全刷无可见影响。0.7.7 保留 ≤16 个归档／512 KiB，并保留 512 KiB 空闲（0.7.8 改为保留期 + 容量策略）。
+- 新设置 `logging_enabled`（NVS `log_on`，默认开启）：关闭后 `logf` 立即返回，不再写 Flash；可经 `logging_set` 或 `settings_set` 立即切换，`status` 报告当前值。
+- 新命令 `log_list`、`log_read`、`log_tail`、`log_rotate`、`log_clear`，USB 与已配对 IP 均可用。见 [设备日志](docs/LOGS.md)。
+- 曾试验 `tools/build.py --usb-otg` 只读 USB 日志盘；因会改变 USB 设备、COM 口和 esptool 复位流程，0.7.8 已决定移除。
+- Studio 0.7.3：新增 Logs 页（开关、文件列表、.tar.gz 查看、过滤、实时尾随、保存、清空）及 `--logs-smoke`。
+
+# 固件 0.7.6 — 更快的导航刷新（实验性）
+
+- 刷新分段计时：`INKOS display` 日志行、`status.display_phase_us` 与 `/display` 报告上电、SPI 传输、0x12 波形、断电与总时长。
+- 导航期间保持面板驱动上电（`hold_power`）：后续标题和选定页全刷直接复用，其他刷新先断电，空闲 `idle_off_ms`（默认 3000 ms）后强制断电。
+- 仅对“提交选页”的整页全刷使用快速 OTP 全刷波形（E0=0x02、E5=0x5A，`fast_full`）；开机、恢复和维护全刷仍为标准波形；连续 8 次快速全刷后下一次用标准波形，30 分钟维护计时以标准全刷为准。
+- 全帧单次 SPI 突发传输，删除多余的刷新后 DTM1 回写（已设置 N2OCP），以 BUSY 边沿等待取代固定 2 ms 命令延时。SPI 保持 10 MHz。
+- 实测（与 0.7.4 对比）：连续标题 **483 → 309 ms**（第一次标题 440 ms），选定页全刷 **4172 → 1703 ms**，第 9 次标准全刷 3976 ms，请求到提交中位数 4780 → 2266 ms；关闭两个开关时标题 480 ms、全刷 4106 ms。
+- 修复 0.7.x 既有的“粘滞变慢”：USB 插着但没有程序读取串口时，4 KB HWCDC 发送缓冲写满，此后每条显示／网络诊断 `Serial.printf` 都会阻塞最多约 2 s，标题和整页延迟数秒，直到重启。任务诊断改写入 16 KiB PSRAM 整行 FIFO，满时淘汰最旧行（`status.log_dropped` 计淘汰行数，`log_buffered` 计保留字节）；control 任务仅在发送缓冲接近空时非阻塞排空，之后再打开串口可按顺序读到最新的保留行。命令回复格式不变。
+- 新命令 `display_tuning_get` / `display_tuning_set`（`hold_power`、`fast_full`、`idle_off_ms`），各自独立 NVS 键；兼容 Studio 0.7.2。残影、低温和长时间保持驱动电压的影响需要实物验证。
+
 # Firmware 0.7.5 — Thin rounded weather symbols
 
 - Replace the weather symbol family with pinned Lucide outlines, adapted to thin native 16/24/40/64 px monochrome masks with rounded caps and joins.

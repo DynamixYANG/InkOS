@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="InkOS.Studio.Views.LogsView">
+ <StackPanel>
+  <TextBlock Text="LOGS / 07" Classes="label"/>
+  <TextBlock Text="What the screen did." Classes="title" Margin="0,0,0,10"/>
+  <TextBlock Text="Diagnostics are buffered in RAM, written to the device's flash every few seconds and rotated into .tar.gz archives at 64 KB. Logging never blocks the display." Classes="muted" Margin="0,0,0,24"/>
+  <Border Classes="section"><Grid ColumnDefinitions="*,Auto">
+   <StackPanel Spacing="6">
+    <TextBlock Text="DEVICE LOGGING" Classes="label"/>
+    <TextBlock Text="Off: no RAM logging and no flash writes. Existing archives stay readable. Saved on the device immediately." Classes="muted"/>
+   </StackPanel>
+   <ToggleSwitch x:Name="LoggingToggle" Grid.Column="1" IsChecked="{Binding LoggingEnabled,Mode=TwoWay}" IsEnabled="{Binding LogsAvailable}" OnContent="On" OffContent="Off" VerticalAlignment="Center" Margin="18,0,0,0"/>
+  </Grid></Border>
+  <Border Classes="section"><Grid ColumnDefinitions="*,Auto">
+   <StackPanel Spacing="6">
+    <TextBlock Text="KEEP LOGS FOR" Classes="label"/>
+    <TextBlock Text="Archives older than this are deleted daily and at each rotation, once the clock is set. The space budget below always applies first." Classes="muted"/>
+   </StackPanel>
+   <ComboBox x:Name="RetentionInput" Grid.Column="1" ItemsSource="{Binding RetentionLabels}" SelectedIndex="{Binding RetentionIndex,Mode=TwoWay}" IsEnabled="{Binding StorageAvailable}" Width="160" VerticalAlignment="Center" Margin="18,0,0,0"/>
+  </Grid></Border>
+  <Border Classes="section"><StackPanel Spacing="10">
+   <TextBlock Text="STORAGE / EXTERNAL FLASH LITTLEFS" Classes="label"/>
+   <TextBlock x:Name="StorageSummaryText" Text="{Binding StorageSummary}" FontSize="12"/>
+   <Border CornerRadius="3" ClipToBounds="True" BorderBrush="#D6D6D6" BorderThickness="1" Height="14"><Grid x:Name="StorageBar"/></Border>
+   <WrapPanel x:Name="StorageLegend" Orientation="Horizontal"/>
+   <TextBlock Text="{Binding StorageBreakdown}" Classes="muted" FontSize="11"/>
+   <TextBlock Text="{Binding CapacityText}" Classes="muted" FontSize="11"/>
+   <Border x:Name="CapacityWarningBox" IsVisible="{Binding HasCapacityWarning}" Background="#FFF7E6" BorderBrush="#E8C77A" BorderThickness="1" CornerRadius="4" Padding="12,8"><TextBlock Text="{Binding CapacityWarning}" FontSize="12" TextWrapping="Wrap"/></Border>
+   <TextBlock Text="{Binding FontsSummary}" Classes="muted" FontSize="11"/>
+  </StackPanel></Border>
+  <Border Classes="section"><StackPanel Spacing="12">
+   <Grid ColumnDefinitions="*,Auto"><TextBlock Text="FILES / DEVICE FLASH /logs" Classes="label" VerticalAlignment="Center"/>
+    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+     <Button Classes="Outline" Command="{Binding RefreshLogsCommand}"><TextBlock Text="Refresh" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+     <Button Classes="Outline" Command="{Binding DeleteSelectedLogsCommand}"><TextBlock Text="Delete selected…" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+     <Button Classes="Primary" Command="{Binding OpenLogCommand}"><TextBlock Text="Open" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+    </StackPanel></Grid>
+   <TextBlock Text="{Binding LogSummary}" Classes="muted" FontSize="11"/>
+   <Grid ColumnDefinitions="*,110,170" Margin="12,0"><TextBlock Text="NAME" Classes="label"/><TextBlock Grid.Column="1" Text="SIZE" Classes="label"/><TextBlock Grid.Column="2" Text="MODIFIED" Classes="label"/></Grid>
+   <ListBox x:Name="LogFileList" ItemsSource="{Binding LogFiles}" SelectionMode="Multiple,Toggle" SelectedItems="{Binding SelectedLogs}" SelectedItem="{Binding SelectedLog,Mode=TwoWay}" MaxHeight="190" BorderBrush="#E2E2E2" BorderThickness="1" CornerRadius="4">
+    <ListBox.Styles><Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.Styles>
+    <ListBox.ItemTemplate><DataTemplate>
+     <Grid ColumnDefinitions="*,110,170"><TextBlock Text="{Binding Name}" FontSize="12"/><TextBlock Grid.Column="1" Text="{Binding SizeText}" FontSize="12"/><TextBlock Grid.Column="2" Text="{Binding ModifiedText}" FontSize="12"/></Grid>
+    </DataTemplate></ListBox.ItemTemplate>
+   </ListBox>
+   <TextBlock Text="Click to select or unselect files. Open shows the last selected file." Classes="muted" FontSize="11"/>
+   <StackPanel x:Name="DeleteConfirm" Orientation="Horizontal" Spacing="10" IsVisible="{Binding ConfirmDelete}">
+    <TextBlock Text="{Binding DeletePrompt}" VerticalAlignment="Center" FontSize="12"/>
+    <Button Classes="Destructive" Command="{Binding ConfirmDeleteLogsCommand}"><TextBlock Text="Delete" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+    <Button Classes="Ghost" Command="{Binding CancelDeleteLogsCommand}"><TextBlock Text="Cancel" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+   </StackPanel>
+  </StackPanel></Border>
+  <Border Classes="section"><StackPanel Spacing="12">
+   <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding LogTitle}" Classes="label" VerticalAlignment="Center"/>
+    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+     <CheckBox x:Name="LiveTailInput" Content="Live tail" IsChecked="{Binding LiveTail,Mode=TwoWay}" IsEnabled="{Binding LogsAvailable}" VerticalAlignment="Center"/>
+     <Button Classes="Outline" Command="{Binding TailOnceCommand}"><TextBlock Text="Tail now" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+     <Button Classes="Outline" Click="SaveLog" IsEnabled="{Binding CanSaveLog}"><TextBlock Text="Save to disk…" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+    </StackPanel></Grid>
+   <TextBox x:Name="LogFilterInput" Text="{Binding LogFilter,Mode=TwoWay}" PlaceholderText="Filter lines (e.g. navigation, display mode=full, WiFi)"/>
+   <TextBox x:Name="LogViewer" Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" Height="300" FontSize="11" VerticalContentAlignment="Top" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+  </StackPanel></Border>
+  <Border Classes="section"><StackPanel Spacing="10">
+   <TextBlock Text="CLEAR ALL" Classes="label"/>
+   <TextBlock Text="Deletes current.log and every archive on the device, and empties the RAM ring." Classes="muted"/>
+   <Button Classes="Ghost" HorizontalAlignment="Left" Command="{Binding ClearLogsCommand}" IsVisible="{Binding !ConfirmClear}"><TextBlock Text="Clear device logs…" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+   <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding ConfirmClear}">
+    <TextBlock Text="Delete all device logs? This cannot be undone." VerticalAlignment="Center" FontSize="12"/>
+    <Button Classes="Destructive" Command="{Binding ConfirmClearLogsCommand}"><TextBlock Text="Delete logs" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+    <Button Classes="Ghost" Command="{Binding CancelClearLogsCommand}"><TextBlock Text="Cancel" FontFamily="{StaticResource StudioFont}" FontSize="12"/></Button>
+   </StackPanel>
+  </StackPanel></Border>
+ </StackPanel>
+</UserControl>
