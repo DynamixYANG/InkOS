@@ -89,6 +89,28 @@ static const Holiday *nextHoliday(Holiday *list, int count, const tm &t) {
       return list + i;
   return nullptr;
 }
+// Next three local days from the 7-day forecast: weekday, native 24 px symbol, high/low.
+static void renderHomeOutlook(Canvas &c, const Model &m, time_t now) {
+  constexpr int x0 = 12, columnWidth = 64, top = 392;
+  auto today = inZone(now, m.settings.localZone);
+  int todayKey = (today.tm_year * 12 + today.tm_mon) * 32 + today.tm_mday, shown = 0;
+  char b[24];
+  for (int i = 0; i < 7 && shown < 3; i++) {
+    const auto &q = m.weather.days[i];
+    if (!q.epoch) continue;
+    auto local = inZone(q.epoch + 3600, m.settings.localZone);
+    if ((local.tm_year * 12 + local.tm_mon) * 32 + local.tm_mday <= todayKey) continue;
+    int x = x0 + shown++ * columnWidth;
+    c.centered(x, top + 14, columnWidth, WEEK[local.tm_wday], 14);
+    if (q.code >= 0) c.icon(x + (columnWidth - 24) / 2, top + 20, 24, q.code);
+    if (isfinite(q.high) && isfinite(q.low)) {
+      snprintf(b, sizeof b, "%d°/%d°", int(lroundf(q.high)), int(lroundf(q.low)));
+      if (c.textWidth(b, 14) > columnWidth - 4)
+        snprintf(b, sizeof b, "%d/%d", int(lroundf(q.high)), int(lroundf(q.low)));
+    } else strlcpy(b, "--/--", sizeof b);
+    c.centered(x, top + 64, columnWidth, b, 14);
+  }
+}
 void renderHome(Canvas &c, const Model &m, time_t now, unsigned phase) {
   renderChrome(c, "TIME / CALENDAR", Page::Home, m);
   renderCurrentPrice(c, m.energy, now);
@@ -145,8 +167,11 @@ void renderHome(Canvas &c, const Model &m, time_t now, unsigned phase) {
     c.text(84, 314, b, 28);
     c.fit(12, 352, 192, condition(w.code), 18);
     char feels[24], wind[24]; number(feels, sizeof feels, w.feels, " C"); number(wind, sizeof wind, w.wind, " m/s");
-    snprintf(b, sizeof b, "Feels %s", feels); c.metricIcon(12, 378, 16, WeatherMetric::Temperature); c.text(36, 392, b, 16);
-    snprintf(b, sizeof b, "Wind %s", wind); c.metricIcon(12, 414, 16, WeatherMetric::Wind); c.text(36, 428, b, 16);
+    // Feels-like and wind share one row (0.7.9) to make room for the next three days.
+    snprintf(b, sizeof b, "Feels %s", feels); c.metricIcon(12, 364, 16, WeatherMetric::Temperature); c.text(36, 378, b, 16);
+    int windX = 36 + c.textWidth(b, 16) + 14;
+    c.metricIcon(windX, 364, 16, WeatherMetric::Wind); c.text(windX + 24, 378, wind, 16);
+    renderHomeOutlook(c, m, now);
   } else {
     c.fit(12, 312, 192, m.settings.location, 18);
     c.text(12, 352, "Fetching weather...", 14);

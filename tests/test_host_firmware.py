@@ -47,5 +47,10 @@ class HostFirmwareTests(unittest.TestCase):
             out = self.build_run([HOST / 'log_policy_test.cpp', SRC / 'LogPolicy.cpp'], cwd=tmp)
             self.assertIn('OK', out.stdout)
 
+    def test_moon_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = self.build_run([HOST / 'moon_events_test.cpp', SRC / 'MoonEvents.cpp'], cwd=tmp)
+            self.assertIn('OK', out.stdout)
+
 if __name__ == '__main__':
     unittest.main()

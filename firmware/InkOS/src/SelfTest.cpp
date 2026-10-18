@@ -1,6 +1,7 @@
 #include "Artwork.h"
 #include "ArtworkFixture.h"
 #include "Astronomy.h"
+#include "MoonEvents.h"
 #include "Canvas.h"
 #include "Domain.h"
 #include "Energy.h"
@@ -157,6 +158,12 @@ bool selfTest() {
         21600);
   check(llabs(moonPhaseEvent(Clock::epoch(2026, 10, 15), 0, false) -
               Clock::epoch(2026, 10, 10, 15, 50)) < 21600);
+  // Moonrise/moonset, Oulu local day 18.10.2026 (EEST): USNO 18:11 / 20:42; 15.10 below, 02.01 above all day.
+  auto moonDay = moonRiseSet(Clock::epoch(2026, 10, 17, 21), Clock::epoch(2026, 10, 18, 21), 65.0121, 25.4651);
+  check(llabs(moonDay.rise - Clock::epoch(2026, 10, 18, 15, 11)) <= 120 &&
+        llabs(moonDay.set - Clock::epoch(2026, 10, 18, 17, 42)) <= 120);
+  check(moonRiseSet(Clock::epoch(2026, 10, 14, 21), Clock::epoch(2026, 10, 15, 21), 65.0121, 25.4651).alwaysDown);
+  check(moonRiseSet(Clock::epoch(2026, 1, 1, 22), Clock::epoch(2026, 1, 2, 22), 65.0121, 25.4651).alwaysUp);
   check(parsePriceTimestamp("2026-10-25T03:00:00+03:00") == Clock::epoch(2026, 10, 25));
   check(parsePriceTimestamp("2026-02-30T00:00:00Z") == 0);
   check(parsePriceTimestamp("2026-10-15T00:00:00") == 0);

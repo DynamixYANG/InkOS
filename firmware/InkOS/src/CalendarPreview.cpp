@@ -93,6 +93,18 @@ static String renderPreview(int fixture) {
     for(int h=0;h<72;h++) {e.hours[h].start=now/3600*3600+(h-24)*3600;e.hours[h].spotNetCt=5+9*sinf(h*.31f);}
   }
   if(fixture==13) {now=fromZone(Clock::epoch(2026,12,31,10,30),m->settings.localZone);monday=Clock::epoch(2026,12,31);new(&m->agenda)Agenda();m->agenda.configured=true;for(int d=0;d<7;d++)add(d,9*60,11*60,"Year boundary event");}
+  if (fixture == 0 || fixture == 3 || fixture == 5 || fixture == 8) {
+    // Synthetic 7-day outlook for Home (0.7.9): today + next days, including a sub-zero day.
+    auto today = inZone(now, m->settings.localZone);
+    time_t first = Clock::epoch(today.tm_year + 1900, today.tm_mon + 1, today.tm_mday);
+    const int codes[] = {3, 61, 2, 71, 0, 80, 95};
+    const float highs[] = {11, 12, 9, -2, 7, 8, 10}, lows[] = {4, 5, 1, -11, 0, 2, 3};
+    for (int d = 0; d < 7; d++) {
+      auto &day = m->weather.days[d];
+      day.epoch = fromZone(first + d * 86400, m->settings.localZone);
+      day.high = highs[d]; day.low = lows[d]; day.code = codes[d];
+    }
+  }
   memcpy(pbm, "P4\n800 480\n", 11); Canvas canvas(pbm + 11);
   if (fixture == 0 || fixture == 3 || fixture == 5 || fixture == 8) renderHome(canvas, *m, now);
   else if (fixture == 9) renderForecast(canvas,*m,now);

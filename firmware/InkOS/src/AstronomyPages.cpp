@@ -1,4 +1,5 @@
 #include "Astronomy.h"
+#include "MoonEvents.h"
 #include "Canvas.h"
 #include "Layout.h"
 #include "Zones.h"
@@ -51,12 +52,65 @@ void solarEventIcon(Canvas &c, int x, int y, bool rising, int size) {
   c.line(x + 2, base - 6, x, base - 8);
   c.line(x + size - 2, base - 6, x + size, base - 8);
 }
+// Moonrise/moonset for the current local day, cached per day and location.
+static MoonDay homeMoonDay(const Settings &s, time_t now) {
+  static portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
+  static time_t cachedStart = 0;
+  static double cachedLat = NAN, cachedLon = NAN;
+  static MoonDay cached;
+  time_t wall = localWall(now, s.localZone), start = fromZone(wall, s.localZone),
+         end = fromZone(wall + 86400, s.localZone);
+  portENTER_CRITICAL(&lock);
+  bool hit = cachedStart == start && cachedLat == s.latitude && cachedLon == s.longitude;
+  MoonDay out = cached;
+  portEXIT_CRITICAL(&lock);
+  if (hit) return out;
+  out = moonRiseSet(start, end, s.latitude, s.longitude);
+  portENTER_CRITICAL(&lock);
+  cachedStart = start; cachedLat = s.latitude; cachedLon = s.longitude; cached = out;
+  portEXIT_CRITICAL(&lock);
+  return out;
+}
+// Horizon, thin crescent and direction arrow; 1-px strokes in the footprint of solarEventIcon.
+void moonEventIcon(Canvas &c, int x, int y, bool rising, int size) {
+  int base = y + size - 3, r = size / 4 + 1, cx = x + r + 1, cy = base - r - 2;
+  c.line(x, base, x + size, base);
+  // Outer limb: left half circle. Terminator: arc of a circle through both cusps, centred to the right.
+  double inner = r * 0.7, ir = sqrt(inner * inner + double(r * r));
+  for (int a = 90; a <= 270; a += 6) {
+    double t = a * 3.141592653589793 / 180;
+    c.dot(cx + int(lround(r * cos(t))), cy - int(lround(r * sin(t))));
+  }
+  double cusp = atan2(double(r), inner);
+  for (int i = 0; i <= 12; i++) {
+    double t = 3.141592653589793 - cusp + 2 * cusp * i / 12;
+    c.dot(int(lround(cx + inner + ir * cos(t))), int(lround(cy - ir * sin(t))));
+  }
+  int ax = x + size - 4, top = y + 1, bottom = base - 3;
+  c.line(ax, top, ax, bottom);
+  int tip = rising ? top : bottom, tail = rising ? tip + 3 : tip - 3;
+  c.line(ax, tip, ax - 3, tail);
+  c.line(ax, tip, ax + 3, tail);
+}
 void renderHomeAstronomy(Canvas &c, const Settings &s, time_t now) {
   c.line(layout::WeatherDivider, 260, layout::WeatherDivider, layout::HomeBottom);
   c.line(layout::MoonDivider, 260, layout::MoonDivider, layout::HomeBottom);
   if (!Clock::valid()) { c.centered(232, 354, 76, "--", 18); return; }
   auto moon = moonState(now);
-  moonIcon(c, 270, 354, 33, moon.phase, moon.illuminated, s.latitude < 0);
+  moonIcon(c, 270, 318, 33, moon.phase, moon.illuminated, s.latitude < 0);
+  auto day = homeMoonDay(s, now);
+  char t[24];
+  if (day.alwaysUp || day.alwaysDown) {
+    c.centered(222, 398, 96, day.alwaysUp ? "ABOVE" : "BELOW", 14);
+    c.centered(222, 418, 96, "HORIZON", 14);
+  } else
+    for (int k = 0; k < 2; k++) {
+      int y = 372 + k * 34;
+      moonEventIcon(c, 232, y, !k, 18);
+      time_t at = k ? day.set : day.rise;
+      clockText(t, sizeof t, at ? at + 30 : 0, s.localZone); // nearest minute, like almanacs
+      c.text(258, y + 19, t, 20);
+    }
   auto pair = adjacentSolarEvents(now, s.latitude, s.longitude);
   char b[24];
   for (int k=0;k<2;k++) {
