@@ -94,7 +94,7 @@ python tools/capture_pages.py --url http://192.168.1.100
 python tools/package.py --firmware out/firmware --studio out/studio --bridge out/storage-bridge/storage_bridge.ino.bin
 ```
 
-地址替换为设备的实际 DHCP IP；本版未实现 inkos.local 的 mDNS 名称。截图保存在 `out/captures/`，工具最后返回主页。打包前需生成 `out/assets` 。打包工具使用允许清单，分别输出仅含应用的 OTA 包、带共享字库的 USB 迁移包和 Studio 发布包，并生成 SHA256SUMS；不自动上传串口日志、设备配置和备份。
+地址替换为设备的实际 DHCP IP；本版未实现 inkos.local 的 mDNS 名称。截图保存在 `out/captures/`，工具最后返回主页。打包前需生成 `out/assets` 。打包工具使用允许清单，版本号默认取自 `Ota.cpp` 与 `InkOS.Studio.csproj`，输出到 `out/release-<固件版本>/`；分别输出仅含应用的 OTA 包、带共享字库的 USB 迁移包和 Studio 发布包，并生成 SHA256SUMS；不自动上传串口日志、设备配置和备份。
 
 Release 二进制的 SHA 应以 Release 的 SHA256SUMS 为准，不假定不同工具链、构建时间和路径下都能产生逐字节相同的文件。
 
