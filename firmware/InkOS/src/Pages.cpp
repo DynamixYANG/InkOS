@@ -89,6 +89,32 @@ static const Holiday *nextHoliday(Holiday *list, int count, const tm &t) {
       return list + i;
   return nullptr;
 }
+// Next three local days from the 7-day forecast: weekday, native 24 px symbol, high/low.
+// Left-aligned columns at x 12/86/160 so the first one sits on the block edge; the last
+// ends at most at x 224 (12 px inner padding before the weather/moon divider).
+static void renderHomeOutlook(Canvas &c, const Model &m, time_t now) {
+  constexpr int x0 = layout::Margin, pitch = 74, labelBaseline = 394, iconTop = 402,
+                tempBaseline = layout::HomeRowValue[2], maxWidth = 64;
+  auto today = inZone(now, m.settings.localZone);
+  int todayKey = (today.tm_year * 12 + today.tm_mon) * 32 + today.tm_mday, shown = 0;
+  char b[24];
+  for (int i = 0; i < 7 && shown < 3; i++) {
+    const auto &q = m.weather.days[i];
+    if (!q.epoch) continue;
+    auto local = inZone(q.epoch + 3600, m.settings.localZone);
+    if ((local.tm_year * 12 + local.tm_mon) * 32 + local.tm_mday <= todayKey) continue;
+    int x = x0 + shown++ * pitch;
+    c.text(x, labelBaseline, WEEK[local.tm_wday], 14);
+    if (q.code >= 0) c.icon(x, iconTop, 24, q.code);
+    if (isfinite(q.high) && isfinite(q.low)) {
+      snprintf(b, sizeof b, "%d°/%d°", int(lroundf(q.high)), int(lroundf(q.low)));
+      if (c.textWidth(b, 14) > maxWidth)
+        snprintf(b, sizeof b, "%d/%d", int(lroundf(q.high)), int(lroundf(q.low)));
+    } else strlcpy(b, "--/--", sizeof b);
+    c.text(x, tempBaseline, b, 14);
+  }
+  if (!shown) c.text(x0, labelBaseline, "No 3-day forecast", 14);
+}
 void renderHome(Canvas &c, const Model &m, time_t now, unsigned phase) {
   renderChrome(c, "TIME / CALENDAR", Page::Home, m);
   renderCurrentPrice(c, m.energy, now);
@@ -105,7 +131,7 @@ void renderHome(Canvas &c, const Model &m, time_t now, unsigned phase) {
     c.circle(6 + 2 * advance + advance / 2, 143, 3, 3);
   }
   snprintf(b, sizeof b, "%s  %02d.%02d.%04d", WEEK[fi.tm_wday], fi.tm_mday, fi.tm_mon + 1, fi.tm_year + 1900);
-  c.text(12, 216, Clock::valid() ? b : "Waiting for network time", 18);
+  c.text(12, 210, Clock::valid() ? b : "Waiting for network time", 18); // shares the London baseline
   for (int i = 0; i < 2; i++) {
     int y = 90 + i * 86;
     auto local = inZone(now, m.settings.worlds[i].zone);
@@ -140,19 +166,27 @@ void renderHome(Canvas &c, const Model &m, time_t now, unsigned phase) {
     number(b, sizeof b, w.temp, "°C", 1);
     bool test=m.iconTest>=0&&esp_timer_get_time()<m.iconTestUntilUs;
     int code=test?m.iconTest:w.code;bool daylight=test?true:w.daylight;
-    if (m.settings.animations||test) c.animatedIcon(12, 274, 64, code, daylight, phase);
-    else c.icon(12, 274, 64, code, daylight);
-    c.text(84, 314, b, 28);
-    c.fit(12, 352, 192, condition(w.code), 18);
-    char feels[24], wind[24]; number(feels, sizeof feels, w.feels, " C"); number(wind, sizeof wind, w.wind, " m/s");
-    snprintf(b, sizeof b, "Feels %s", feels); c.metricIcon(12, 378, 16, WeatherMetric::Temperature); c.text(36, 392, b, 16);
-    snprintf(b, sizeof b, "Wind %s", wind); c.metricIcon(12, 414, 16, WeatherMetric::Wind); c.text(36, 428, b, 16);
+    // Row 1: 64 px symbol; temperature (shares the PREV-time baseline) and condition beside it.
+    if (m.settings.animations||test) c.animatedIcon(layout::Margin, layout::HomeIconTop, 64, code, daylight, phase);
+    else c.icon(layout::Margin, layout::HomeIconTop, 64, code, daylight);
+    constexpr int textX = 88, textWidth = layout::WeatherDivider - 12 - textX;
+    c.fit(textX, layout::HomeRowValue[0], textWidth, b, 28);
+    c.fit(textX, 336, textWidth, condition(w.code), 18);
+    // Row 2: feels-like and wind, 16 px; then the outlook group (16 px gap, 8 px inside it).
+    char feels[24], wind[24]; number(feels, sizeof feels, w.feels, "°C"); number(wind, sizeof wind, w.wind, " m/s");
+    constexpr int y = 368;
+    snprintf(b, sizeof b, "Feels %s", feels); c.metricIcon(layout::Margin, y - 14, 16, WeatherMetric::Temperature);
+    c.text(36, y, b, 16);
+    int windX = 36 + c.textWidth(b, 16) + 16;
+    c.metricIcon(windX, y - 14, 16, WeatherMetric::Wind); c.text(windX + 24, y, wind, 16);
+    // Row 3: next three days, temperatures on the shared bottom baseline.
+    renderHomeOutlook(c, m, now);
   } else {
-    c.fit(12, 312, 192, m.settings.location, 18);
-    c.text(12, 352, "Fetching weather...", 14);
-    if (m.weather.error[0]) c.fit(12, 392, 192, m.weather.error, 14);
+    c.fit(layout::Margin, layout::HomeRowValue[0], 212, m.settings.location, 18);
+    c.text(layout::Margin, 336, "Fetching weather...", 14);
+    if (m.weather.error[0]) c.fit(layout::Margin, layout::HomeRowValue[1], 212, m.weather.error, 14);
   }
-  renderHomeAstronomy(c, m.settings, now);
+  renderHomeAstronomy(c, m.settings, m.aurora, now);
 }
 static int wrap(Canvas &c, int x, int baseline, int width, const char *text, int size,
                 int maxLines) {

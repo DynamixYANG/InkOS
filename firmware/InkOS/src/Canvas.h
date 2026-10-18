@@ -47,7 +47,9 @@ void renderMoon(Canvas &, const Model &, time_t);
 void renderSun(Canvas &, const Model &, time_t);
 void renderEnergy(Canvas &, const Model &, time_t);
 void renderCurrentPrice(Canvas &, const Energy &, time_t);
-void renderHomeAstronomy(Canvas &, const Settings &, time_t);
+void renderHomeAstronomy(Canvas &, const Settings &, const Aurora &, time_t);
+struct AuroraTonight { NightWindow window; KpPeak peak; };
+AuroraTonight auroraTonight(const Settings &, const Aurora &, time_t now); // Home "tonight" Kp
 void moonIcon(Canvas &,int x,int y,int radius,double phase,double illuminated,bool southern=false);
 void solarEventIcon(Canvas &,int x,int y,bool rising,int size=18);
 } // namespace ink

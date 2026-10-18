@@ -15,6 +15,16 @@
     "weather-snowy-heavy": "4484ee1538f179bbd4b218ffc74f01ae4097f676e36f09ca309a86ae5f08385e",
     "weather-snowy-rainy": "5894f3ade493b6221f63616814a2d5ade8df543f961c5ace1f7ce2eda6599643",
     "weather-lightning-rainy": "3f10f42bfa032290a466cf9ebd2a04e65a3560519c7528352bd25bc6827ee48e",
-    "weather-hail": "24a3a7c23dfe9c94f1b0952736dc65e18f435cdf18b9b7cf3a9811fdb4c6d5e1"
+    "weather-hail": "24a3a7c23dfe9c94f1b0952736dc65e18f435cdf18b9b7cf3a9811fdb4c6d5e1",
+    "aurora": "38593ac2d1f7be2fe2315cf65eac7aaf071de373ce034292acf0f0cf68424f13"
+  },
+  "derived_glyphs": {
+    "aurora": {
+      "codepoint": "F1BB9",
+      "native_sizes": [
+        40,
+        64
+      ]
+    }
   }
 }

@@ -1,4 +1,6 @@
 #include "Astronomy.h"
+#include "MoonEvents.h"
+#include "MdiIconsData.h"
 #include "Canvas.h"
 #include "Layout.h"
 #include "Zones.h"
@@ -51,21 +53,108 @@ void solarEventIcon(Canvas &c, int x, int y, bool rising, int size) {
   c.line(x + 2, base - 6, x, base - 8);
   c.line(x + size - 2, base - 6, x + size, base - 8);
 }
-void renderHomeAstronomy(Canvas &c, const Settings &s, time_t now) {
-  c.line(layout::WeatherDivider, 260, layout::WeatherDivider, layout::HomeBottom);
-  c.line(layout::MoonDivider, 260, layout::MoonDivider, layout::HomeBottom);
-  if (!Clock::valid()) { c.centered(232, 354, 76, "--", 18); return; }
-  auto moon = moonState(now);
-  moonIcon(c, 270, 354, 33, moon.phase, moon.illuminated, s.latitude < 0);
-  auto pair = adjacentSolarEvents(now, s.latitude, s.longitude);
-  char b[24];
-  for (int k=0;k<2;k++) {
-    auto event=k?pair.next:pair.previous;int y=292+k*94;
-    c.text(layout::SolarLeft,y,k?"NEXT":"PREV",14);
-    if(event.at)solarEventIcon(c,layout::SolarLeft,y+15,event.rising,18);
-    clockText(b,sizeof b,event.at,s.localZone);
-    c.text(layout::SolarLeft+26,y+34,b,20);
+// Moonrise/moonset for the current local day, cached per day and location.
+static MoonDay homeMoonDay(const Settings &s, time_t now) {
+  static portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
+  static time_t cachedStart = 0;
+  static double cachedLat = NAN, cachedLon = NAN;
+  static MoonDay cached;
+  time_t wall = localWall(now, s.localZone), start = fromZone(wall, s.localZone),
+         end = fromZone(wall + 86400, s.localZone);
+  portENTER_CRITICAL(&lock);
+  bool hit = cachedStart == start && cachedLat == s.latitude && cachedLon == s.longitude;
+  MoonDay out = cached;
+  portEXIT_CRITICAL(&lock);
+  if (hit) return out;
+  out = moonRiseSet(start, end, s.latitude, s.longitude);
+  portENTER_CRITICAL(&lock);
+  cachedStart = start; cachedLat = s.latitude; cachedLon = s.longitude; cached = out;
+  portEXIT_CRITICAL(&lock);
+  return out;
+}
+// Horizon, thin crescent and direction arrow; 1-px strokes in the footprint of solarEventIcon.
+void moonEventIcon(Canvas &c, int x, int y, bool rising, int size) {
+  int base = y + size - 3, r = size / 4 + 1, cx = x + r + 1, cy = base - r - 2;
+  c.line(x, base, x + size, base);
+  // Outer limb: left half circle. Terminator: arc of a circle through both cusps, centred to the right.
+  double inner = r * 0.7, ir = sqrt(inner * inner + double(r * r));
+  for (int a = 90; a <= 270; a += 6) {
+    double t = a * 3.141592653589793 / 180;
+    c.dot(cx + int(lround(r * cos(t))), cy - int(lround(r * sin(t))));
   }
+  double cusp = atan2(double(r), inner);
+  for (int i = 0; i <= 12; i++) {
+    double t = 3.141592653589793 - cusp + 2 * cusp * i / 12;
+    c.dot(int(lround(cx + inner + ir * cos(t))), int(lround(cy - ir * sin(t))));
+  }
+  int ax = x + size - 4, top = y + 1, bottom = base - 3;
+  c.line(ax, top, ax, bottom);
+  int tip = rising ? top : bottom, tail = rising ? tip + 3 : tip - 3;
+  c.line(ax, tip, ax - 3, tail);
+  c.line(ax, tip, ax + 3, tail);
+}
+// Sun context for the aurora window: current sun state and the next two solar events.
+static SunContext sunContext(time_t now, double lat, double lon, const SolarPair &pair) {
+  SunContext s;
+  s.sunUp = solarAltitude(now, lat, lon) > -0.833;
+  s.next = pair.next.at; s.nextRising = pair.next.rising;
+  if (pair.next.at && pair.next.at - now <= 86400) {
+    auto after = adjacentSolarEvents(pair.next.at, lat, lon).next;
+    s.following = after.at; s.followingRising = after.rising;
+  }
+  return s;
+}
+static AuroraTonight auroraTonight(const Settings &s, const Aurora &aurora, time_t now, const SolarPair &pair) {
+  AuroraTonight out;
+  out.window = nightWindow(now, sunContext(now, s.latitude, s.longitude, pair));
+  if (out.window.kind != NightKind::PolarDay) out.peak = peakKp(aurora, out.window.start, out.window.end);
+  return out;
+}
+AuroraTonight auroraTonight(const Settings &s, const Aurora &aurora, time_t now) {
+  return auroraTonight(s, aurora, now, adjacentSolarEvents(now, s.latitude, s.longitude));
+}
+// Moon (x 236-336) and sun (x 336-436) columns. Both use the shared Home rows: row 1 is the
+// 64 px disc / PREV, rows 2 and 3 carry moonrise / NEXT and moonset / tonight's Kp.
+void renderHomeAstronomy(Canvas &c, const Settings &s, const Aurora &aurora, time_t now) {
+  using namespace layout;
+  c.line(WeatherDivider, HomeBlockTop, WeatherDivider, HomeBottom);
+  c.line(MoonDivider, HomeBlockTop, MoonDivider, HomeBottom);
+  constexpr int moonX = WeatherDivider + 12, moonCenter = (WeatherDivider + MoonDivider) / 2;
+  if (!Clock::valid()) {
+    c.centered(WeatherDivider, HomeRowValue[1], MoonDivider - WeatherDivider, "--", 18);
+    c.centered(MoonDivider, HomeRowValue[1], HomeLeftRight - MoonDivider, "--", 18);
+    return;
+  }
+  auto moon = moonState(now);
+  moonIcon(c, moonCenter, HomeIconTop + 32, 32, moon.phase, moon.illuminated, s.latitude < 0);
+  auto day = homeMoonDay(s, now);
+  char t[24];
+  if (day.alwaysUp || day.alwaysDown) {
+    c.centered(WeatherDivider, 404, MoonDivider - WeatherDivider, day.alwaysUp ? "ABOVE" : "BELOW", 14);
+    c.centered(WeatherDivider, HomeRowLabel[2], MoonDivider - WeatherDivider, "HORIZON", 14);
+  } else
+    for (int k = 0; k < 2; k++) {
+      int baseline = HomeRowValue[1 + k];
+      moonEventIcon(c, moonX, baseline - 19, !k, 18);
+      time_t at = k ? day.set : day.rise;
+      clockText(t, sizeof t, at ? at + 30 : 0, s.localZone); // nearest minute, like almanacs
+      c.text(moonX + 26, baseline, t, 20);
+    }
+  auto pair = adjacentSolarEvents(now, s.latitude, s.longitude);
+  for (int k = 0; k < 2; k++) {
+    auto event = k ? pair.next : pair.previous;
+    c.text(SolarLeft, HomeRowLabel[k], k ? "NEXT" : "PREV", 14);
+    if (event.at) solarEventIcon(c, SolarLeft, HomeRowValue[k] - 19, event.rising, 18);
+    clockText(t, sizeof t, event.at, s.localZone);
+    c.text(SolarLeft + 26, HomeRowValue[k], t, 20);
+  }
+  // Tonight's highest planetary K-index (NOAA SWPC 3-hour bins), MDI aurora at native 40 px.
+  KpPeak peak = auroraTonight(s, aurora, now, pair).peak;
+  kpText(t, sizeof t, peak.kp);
+  if (peak.kp >= 0 && kpStale(aurora, now)) strlcat(t, "?", sizeof t); // older than 6 h
+  c.image(SolarLeft, HomeRowValue[2] - 38, 40, 40, mdi_assets::aurora_40);
+  c.text(SolarLeft + 44, HomeRowLabel[2], "Kp", 14);
+  c.text(SolarLeft + 44, HomeRowValue[2], t, 20);
 }
 void renderMoon(Canvas &c, const Model &m, time_t now) {
   renderChrome(c, "LUNAR CALENDAR", Page::Moon, m);

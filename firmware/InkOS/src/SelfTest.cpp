@@ -1,6 +1,7 @@
 #include "Artwork.h"
 #include "ArtworkFixture.h"
 #include "Astronomy.h"
+#include "MoonEvents.h"
 #include "Canvas.h"
 #include "Domain.h"
 #include "Energy.h"
@@ -157,6 +158,22 @@ bool selfTest() {
         21600);
   check(llabs(moonPhaseEvent(Clock::epoch(2026, 10, 15), 0, false) -
               Clock::epoch(2026, 10, 10, 15, 50)) < 21600);
+  // Moonrise/moonset, Oulu local day 18.10.2026 (EEST): USNO 18:11 / 20:42; 15.10 below, 02.01 above all day.
+  auto moonDay = moonRiseSet(Clock::epoch(2026, 10, 17, 21), Clock::epoch(2026, 10, 18, 21), 65.0121, 25.4651);
+  check(llabs(moonDay.rise - Clock::epoch(2026, 10, 18, 15, 11)) <= 120 &&
+        llabs(moonDay.set - Clock::epoch(2026, 10, 18, 17, 42)) <= 120);
+  check(moonRiseSet(Clock::epoch(2026, 10, 14, 21), Clock::epoch(2026, 10, 15, 21), 65.0121, 25.4651).alwaysDown);
+  check(moonRiseSet(Clock::epoch(2026, 1, 1, 22), Clock::epoch(2026, 1, 2, 22), 65.0121, 25.4651).alwaysUp);
+  { // Kp parser, NOAA thirds and the tonight window (full cases run as host tests)
+    static Aurora kp;
+    const char *json = "[{\"time_tag\":\"2026-10-18T21:00:00\",\"kp\":1.67,\"observed\":\"estimated\"},"
+                       "{\"time_tag\":\"2026-10-19T00:00:00\",\"kp\":4.67,\"observed\":\"predicted\"}]";
+    check(parseKpForecast(json, strlen(json), kp) == 2);
+    char t[8]; kpText(t, sizeof t, peakKp(kp, Clock::epoch(2026, 10, 18, 14, 48), Clock::epoch(2026, 10, 19, 5, 23)).kp);
+    check(!strcmp(t, "5-"));
+    SunContext sun; sun.sunUp = true; sun.next = Clock::epoch(2026, 7, 25); sun.nextRising = false;
+    check(nightWindow(Clock::epoch(2026, 6, 21, 12), sun).kind == NightKind::PolarDay);
+  }
   check(parsePriceTimestamp("2026-10-25T03:00:00+03:00") == Clock::epoch(2026, 10, 25));
   check(parsePriceTimestamp("2026-02-30T00:00:00Z") == 0);
   check(parsePriceTimestamp("2026-10-15T00:00:00") == 0);

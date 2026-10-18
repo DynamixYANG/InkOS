@@ -1,4 +1,4 @@
-"""Host builds of hardware-independent firmware pieces (log ring, log naming/retention policy).
+"""Host builds of hardware-independent firmware pieces (log ring, log policy, moon events, aurora Kp).
 
 Needs a C++17 compiler: $CXX, c++/g++/clang++ on PATH, or `python -m ziglang c++`.
 Skipped when none is available.
@@ -45,6 +45,17 @@ class HostFirmwareTests(unittest.TestCase):
     def test_log_policy(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = self.build_run([HOST / 'log_policy_test.cpp', SRC / 'LogPolicy.cpp'], cwd=tmp)
+            self.assertIn('OK', out.stdout)
+
+    def test_moon_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = self.build_run([HOST / 'moon_events_test.cpp', SRC / 'MoonEvents.cpp'], cwd=tmp)
+            self.assertIn('OK', out.stdout)
+
+    def test_aurora(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sample = HOST / 'data/noaa-kp-forecast-20261018.json'
+            out = self.build_run([HOST / 'aurora_test.cpp', SRC / 'Aurora.cpp'], f'-DKP_SAMPLE="{sample.as_posix()}"', cwd=tmp)
             self.assertIn('OK', out.stdout)
 
 if __name__ == '__main__':

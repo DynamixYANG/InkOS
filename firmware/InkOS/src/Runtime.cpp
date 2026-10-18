@@ -122,6 +122,7 @@ void networkTask(void *) {
       }
       serviceLyricProbe();
       updateEnergy();
+      updateAurora();
       Page page;
       {
         Guard g(modelMutex);
@@ -270,7 +271,7 @@ void displayTask(void *) {
 }
 static cJSON *deviceStatus() {
   Guard g(modelMutex); auto out = cJSON_CreateObject();
-  cJSON_AddBoolToObject(out, "inkos", true); cJSON_AddStringToObject(out, "version", "0.7.8");
+  cJSON_AddBoolToObject(out, "inkos", true); cJSON_AddStringToObject(out, "version", "0.7.10");
   cJSON_AddNumberToObject(out, "page", int(model->page)); cJSON_AddBoolToObject(out, "wifi", model->wifi);
   cJSON_AddStringToObject(out, "ip", model->ip); cJSON_AddBoolToObject(out, "spotify", model->music.authorized);
   cJSON_AddBoolToObject(out, "weather", model->weather.valid);
@@ -278,6 +279,18 @@ static cJSON *deviceStatus() {
   cJSON_AddNumberToObject(out, "time", time(nullptr));
   cJSON_AddNumberToObject(out, "free_heap", ESP.getFreeHeap());
   cJSON_AddNumberToObject(out, "psram", ESP.getFreePsram());
+  { // Home "tonight" Kp, for validation against the live NOAA product
+    auto k = cJSON_AddObjectToObject(out, "aurora");
+    auto tonight = auroraTonight(model->settings, model->aurora, time(nullptr));
+    cJSON_AddNumberToObject(k, "bins", model->aurora.count);
+    cJSON_AddNumberToObject(k, "fetched", double(model->aurora.fetched));
+    cJSON_AddBoolToObject(k, "stale", kpStale(model->aurora, time(nullptr)));
+    cJSON_AddNumberToObject(k, "kind", int(tonight.window.kind));
+    cJSON_AddNumberToObject(k, "window_start", double(tonight.window.start));
+    cJSON_AddNumberToObject(k, "window_end", double(tonight.window.end));
+    cJSON_AddNumberToObject(k, "kp", tonight.peak.kp);
+    cJSON_AddNumberToObject(k, "kp_at", double(tonight.peak.at));
+  }
   cJSON_AddBoolToObject(out, "remote_enabled", remoteEnabled());
   cJSON_AddNumberToObject(out, "battery_percent", model->batteryPercent);
   cJSON_AddNumberToObject(out, "battery_voltage", model->batteryVoltage);
@@ -445,7 +458,7 @@ void controlTask(void *) {
     {
       Guard g(modelMutex);
       snprintf(b, sizeof b,
-               "{\"version\":\"0.7.8\",\"page\":%d,\"wifi\":%s,\"weather\":%s,\"spotify\":%s,"
+               "{\"version\":\"0.7.10\",\"page\":%d,\"wifi\":%s,\"weather\":%s,\"spotify\":%s,"
                "\"time\":%lld,\"weather_provider\":%d,\"hours\":%d,\"calendar_configured\":%s,"
                "\"calendar_events\":%d,\"calendar_stale\":%s,\"pages\":7,\"energy\":%s,\"energy_"
                "hours\":%d}",
@@ -644,8 +657,8 @@ void start() {
   xTaskCreatePinnedToCore(networkTask, "network", 16384, nullptr, 1, nullptr, 0);
   xTaskCreatePinnedToCore(inputTask, "input", 3072, nullptr, 3, nullptr, 1);
   xTaskCreatePinnedToCore(controlTask, "control", 12288, nullptr, 1, nullptr, 1);
-  Serial.printf("INKOS boot version=0.7.8 psram=%u bytes model=%u bytes\n", ESP.getPsramSize(),
+  Serial.printf("INKOS boot version=0.7.10 psram=%u bytes model=%u bytes\n", ESP.getPsramSize(),
                 unsigned(sizeof(Model)));
-  logf("INKOS boot version=0.7.8 reset=%d\n", int(esp_reset_reason()));
+  logf("INKOS boot version=0.7.10 reset=%d\n", int(esp_reset_reason()));
 }
 } // namespace ink

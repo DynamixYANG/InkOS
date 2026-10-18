@@ -14,7 +14,7 @@ def load_package(path):
     if b[0]!=0xe9 or int.from_bytes(b[12:14],'little')!=9 or b[32:36]!=bytes.fromhex('3254cdab'):raise ValueError('Not an ESP32-S3 application')
     return m,b
 
-def package(image,assets,output,version='0.7.8'):
+def package(image,assets,output,version='0.7.10'):
     b=Path(image).read_bytes();fonts=json.loads(Path(assets).read_text())
     m=dict(format=1,board=BOARD,layout=LAYOUT,version=version,size=len(b),sha256=hashlib.sha256(b).hexdigest(),font_sha256=fonts['sha256'])
     output=Path(output);output.parent.mkdir(parents=True,exist_ok=True)
@@ -84,7 +84,7 @@ def install(remote,path,progress=print):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);sub=parser.add_subparsers(dest='action',required=True)
-    p=sub.add_parser('pack');p.add_argument('--image',type=Path,required=True);p.add_argument('--assets',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--version',default='0.7.8')
+    p=sub.add_parser('pack');p.add_argument('--image',type=Path,required=True);p.add_argument('--assets',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--version',default='0.7.10')
     p=sub.add_parser('install');p.add_argument('--ip',required=True);p.add_argument('--package',type=Path,required=True)
     args=parser.parse_args()
     if args.action=='pack':print(json.dumps(package(args.image,args.assets,args.output,args.version),indent=2))

@@ -11,7 +11,7 @@
 | 工具链 | Arduino-ESP32 **3.3.12**，.NET **10**，Python 3.11+ | FQBN `esp32:esp32:XIAO_ESP32S3_Plus:PSRAM=opi,CDCOnBoot=default,USBMode=hwcdc` |
 | 分区 | `inkos-ab594-extfs-v2` | 两个 5.9375 MiB A/B 应用槽、内部 4 MiB 字库、外部 4 MiB LittleFS |
 
-参考设备：0.7.8 运行在 ota_1 并已确认健康，0.7.7c 保留在 ota_0；日志开启，保留期 35 天。
+参考设备：0.7.10 运行在 ota_1 并已确认健康，0.7.9 保留在 ota_0；日志开启，保留期 35 天。
 
 ## 2. 架构摘要
 

@@ -7,7 +7,7 @@
 | uICAL | RRULE 引擎 | commit 49262ecf6fed01b6d74f2d3af774a52714a2bc21；[MIT](../libraries/uICAL/LICENSE) |
 | pugixml | iCloud CalDAV XML 解析 | 1.15；[MIT](../libraries/pugixml/LICENSE.md)、[固定来源](../libraries/pugixml/SOURCE.md)；禁用 XPath／异常，分配 XML 节点到 PSRAM |
 | Lucide | 当前天气及温度／降水／风图标 | commit 1ef60af944de207e0d5176905a0759ba12e6ee8d；[官方网站](https://lucide.dev/)、[ISC 与继承 MIT 许可](../assets/icons/lucide/LICENSE)、[固定来源与处理](../assets/icons/lucide/SOURCE.md)；16/24/40/64 px 原生细线单色图 |
-| Material Design Icons | 历史 0.7.0–0.7.4 天气图标 | 7.4.47；[Pictogrammers](https://pictogrammers.com/library/mdi/)、[许可](../assets/icons/mdi/LICENSE)、[原始来源](../assets/icons/mdi/SOURCE.md) |
+| Material Design Icons | 历史 0.7.0–0.7.4 天气图标；0.7.10 起首页 aurora（Kp）图标 | 7.4.47；[Pictogrammers](https://pictogrammers.com/library/mdi/)、[许可](../assets/icons/mdi/LICENSE)、[原始来源](../assets/icons/mdi/SOURCE.md) |
 | SunCalc | 太阳／月亮近似公式改编 | 1.9.0；Vladimir Agafonkin；[BSD-2-Clause](../assets/SunCalc-LICENSE) |
 | Terminus | 小号点阵字 | 4.49.1 normal；[OFL](../assets/fonts/terminus/OFL.TXT) |
 | IBM Plex Mono | 大字与 Studio 字体 | Light / Regular；[OFL](../assets/fonts/license.txt) |
