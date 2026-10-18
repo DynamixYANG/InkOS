@@ -67,5 +67,6 @@ struct RequestOptions {
 bool request(const String &url, HttpResponse &, size_t maximum = 131072, const String &auth = "",
              const String &body = "", const RequestOptions &options = RequestOptions());
 bool fetchWeather(Weather &);
+void updateAurora(); // NOAA SWPC Kp forecast, every 2 h (5-60 min retry)
 void updateSpotify();
 } // namespace ink

@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <time.h>
+#include "Aurora.h"
 namespace ink {
 constexpr int WIDTH = 800, HEIGHT = 480, FRAME_BYTES = 48000, ART = 144, MAX_LYRICS = 320;
 enum class Page : uint8_t { Home, Music, Forecast, Week, Moon, Sun, Energy, Count };
@@ -108,6 +109,7 @@ struct Model {
   Energy energy;
   Music music;
   Agenda agenda;
+  Aurora aurora;
   Settings settings;
   int iconTest = -1;
   int64_t iconTestUntilUs = 0;

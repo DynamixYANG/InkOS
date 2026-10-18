@@ -164,6 +164,16 @@ bool selfTest() {
         llabs(moonDay.set - Clock::epoch(2026, 10, 18, 17, 42)) <= 120);
   check(moonRiseSet(Clock::epoch(2026, 10, 14, 21), Clock::epoch(2026, 10, 15, 21), 65.0121, 25.4651).alwaysDown);
   check(moonRiseSet(Clock::epoch(2026, 1, 1, 22), Clock::epoch(2026, 1, 2, 22), 65.0121, 25.4651).alwaysUp);
+  { // Kp parser, NOAA thirds and the tonight window (full cases run as host tests)
+    static Aurora kp;
+    const char *json = "[{\"time_tag\":\"2026-10-18T21:00:00\",\"kp\":1.67,\"observed\":\"estimated\"},"
+                       "{\"time_tag\":\"2026-10-19T00:00:00\",\"kp\":4.67,\"observed\":\"predicted\"}]";
+    check(parseKpForecast(json, strlen(json), kp) == 2);
+    char t[8]; kpText(t, sizeof t, peakKp(kp, Clock::epoch(2026, 10, 18, 14, 48), Clock::epoch(2026, 10, 19, 5, 23)).kp);
+    check(!strcmp(t, "5-"));
+    SunContext sun; sun.sunUp = true; sun.next = Clock::epoch(2026, 7, 25); sun.nextRising = false;
+    check(nightWindow(Clock::epoch(2026, 6, 21, 12), sun).kind == NightKind::PolarDay);
+  }
   check(parsePriceTimestamp("2026-10-25T03:00:00+03:00") == Clock::epoch(2026, 10, 25));
   check(parsePriceTimestamp("2026-02-30T00:00:00Z") == 0);
   check(parsePriceTimestamp("2026-10-15T00:00:00") == 0);

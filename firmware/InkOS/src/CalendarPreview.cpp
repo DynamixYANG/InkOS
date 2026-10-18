@@ -104,6 +104,12 @@ static String renderPreview(int fixture) {
       day.epoch = fromZone(first + d * 86400, m->settings.localZone);
       day.high = highs[d]; day.low = lows[d]; day.code = codes[d];
     }
+    // Synthetic Kp forecast (0.7.10): 3-hour bins from yesterday, fetched just now.
+    const float kp[] = {1.67f, 2.33f, 3, 4.33f, 3.67f, 2.67f, 2, 1.33f};
+    time_t bin = now / KpBinSeconds * KpBinSeconds - 86400;
+    m->aurora.count = 32;
+    for (int i = 0; i < 32; i++) m->aurora.bins[i] = {bin + i * KpBinSeconds, kp[i % 8], KpKind::Predicted};
+    m->aurora.fetched = now;
   }
   memcpy(pbm, "P4\n800 480\n", 11); Canvas canvas(pbm + 11);
   if (fixture == 0 || fixture == 3 || fixture == 5 || fixture == 8) renderHome(canvas, *m, now);
