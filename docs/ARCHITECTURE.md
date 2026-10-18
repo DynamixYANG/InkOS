@@ -26,7 +26,12 @@ flowchart LR
 |---|---|---|
 | display | core 1 / 2 / 12288 bytes | 获取快照，绘制页面，唯一调用 Panel 的任务 |
 | network | core 0 / 1 / 16384 bytes | 串行执行外部 HTTP、同步和重试，发布数据 |
-| control | core 1 / 1 / 12288 bytes | 物理按键、USB 命令和设备本地 HTTP |
+| control | core 1 / 1 / 12288 bytes | USB 命令、设备本地 HTTP、电池 ADC；非阻塞排空日志到 USB |
+| input | core 1 / 3 / 3072 bytes | 编码器 ISR 通知与按键去抖，发布导航请求（0.7.1） |
+| log-store | core 0 / 1 / 12288 bytes | 日志落盘、tar.gz 轮转、保留期与容量裁剪（0.7.7，见 [LOGS](LOGS.md)） |
+| ota-health | core 0 / 1 / 4096 bytes | 任务心跳、启动健康确认与回滚 |
+
+0.7.8 的任务、同步原语、切页时序和刷新时间预算图见 [交接说明](HANDOVER.md#2-架构摘要)。
 
 Model、绘图快照和大缓冲区位于 PSRAM；内部 RAM 仍承担任务栈和部分 TLS 开销。大型 Model/Music 不放在任务栈上。现有 Model 约 99.4 KB，单张 framebuffer 为 48,000 bytes。
 

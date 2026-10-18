@@ -1,6 +1,6 @@
 # InkOS 文档导航
 
-文档对应固件 **0.7.0**、Studio **0.7.0**。功能状态以当前源码和 [验证记录](VALIDATION.md) 为准；规划不代表已经实现。
+文档对应固件 **0.7.8**、Studio **0.7.4**。接手开发先读 [交接说明](HANDOVER.md)。功能状态以当前源码和 [验证记录](VALIDATION.md) 为准；规划不代表已经实现。
 
 | 文档 | 解决的问题 |
 |---|---|
@@ -17,6 +17,8 @@
 | [TROUBLESHOOTING](TROUBLESHOOTING.md) | 烧录、屏幕、联网、日历、Spotify 和电价问题 |
 | [THIRD_PARTY](THIRD_PARTY.md) | 许可证、字体、服务归属与数据来源 |
 | [ROADMAP](ROADMAP.md) | 已实现边界与后续工作 |
+| [HANDOVER](HANDOVER.md) | 当前版本、任务与刷新时间预算、串口日志卡顿根因、构建／烧录／回滚、待验证清单 |
+| [LOGS](LOGS.md) | 设备日志通路、轮转、保留期、存储容量、命令与 Studio Logs 页 |
 
 从零使用建议顺序：**HARDWARE → BUILD → CONFIGURATION → SPOTIFY**。修改代码建议先读 **ARCHITECTURE → DEVELOPMENT → DISPLAY → VALIDATION**。
 

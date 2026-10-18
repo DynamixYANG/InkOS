@@ -1,0 +1,19 @@
+gantt
+  title 选定页整页全刷 (ms) · 4172 → 1703 · 实测 = 设备分段计时
+  dateFormat x
+  axisFormat %S.%L s
+  section 0.7.4 基线 OTP 全刷 (实测总计 4172)
+  0x10 白+0x13 新 SPI ≈85 (推算)   :e1, 0, 85ms
+  0x04 上电 130 (0.7.6 实测)      :crit, e2, after e1, 130ms
+  0x12 标准 OTP 3852 (0.7.6 实测) :active, e3, after e2, 3852ms
+  0x10 回写 48 KB ≈38 (推算)      :e4, after e3, 38ms
+  固定延时 ≈26 (推算)             :e5, after e4, 26ms
+  0x02 断电 41 (0.7.6 实测)       :crit, e6, after e5, 41ms
+  section 0.7.8 快速全刷 fast_full (实测 1703)
+  单次 SPI 96 KB 83 (实测)        :f1, 0, 83ms
+  0x12 快速 OTP 1580 (实测)       :active, f2, after f1, 1580ms
+  0x02 断电 41 (实测)             :crit, f3, after f2, 41ms
+  section 0.7.8 每第 9 次标准全刷 (实测 3976)
+  SPI 83 (实测)                  :g1, 0, 83ms
+  0x12 标准 OTP 3852 (实测)       :active, g2, after g1, 3852ms
+  0x02 断电 41 (实测)             :crit, g3, after g2, 41ms

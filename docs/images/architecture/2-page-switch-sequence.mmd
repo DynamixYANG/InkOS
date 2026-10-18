@@ -1,0 +1,33 @@
+sequenceDiagram
+  autonumber
+  participant ISR as 编码器 ISR
+  participant IN as input 任务 (P3, C1)
+  participant M as Model + modelMutex
+  participant D as display 任务 (P2, C1)
+  participant P as Panel / UC8179
+  participant L as 日志环 → log-store (C0)
+  ISR->>IN: 满一格 · vTaskNotifyGiveFromISR
+  IN->>M: navigatePage(): 检查编码器锁, revision++, invalidate()
+  M-->>D: xQueueOverwrite(displayEvents)
+  D->>M: 读取小快照 DisplayState (不拷 99 KB)
+  D->>D: renderNavigationTitle() (≈4.6 ms, 0.7.2 实测)
+  alt 第一次标题 (面板未上电)
+    D->>P: 0x04 上电 130 ms → 窗口 SPI 3.6 ms → 0x12 nav500 波形 305 ms
+    P-->>D: 标题可见 · 实测 440 ms · 保持上电 (power=held)
+  else 连续标题 (hold_power)
+    D->>P: 窗口 SPI 3.6 ms → 0x12 波形 305 ms (不上电/不断电)
+    P-->>D: 标题可见 · 实测 309 ms (0.7.4 为 483 ms)
+  end
+  D-)L: logf("INKOS display ... on_us/xfer_us/wave_us/off_us") 不阻塞
+  Note over D: 静默期内预渲染整页 (token 缓存)
+  D->>D: ready(): 距最后输入 ≥ 500 ms 且标题可见 ≥ 100 ms
+  D->>M: lockEncoder(2000 ms)
+  alt fast_full (默认) 且连续快速全刷 < 8
+    D->>P: 复用上电 · 单次 SPI 96 KB 83 ms → 0x12 快速 OTP (E0=0x02, E5=0x5A) 1580 ms → 0x02 断电 41 ms
+    P-->>D: 整页完成 · 实测 1703 ms (0.7.4 为 4172 ms)
+  else 第 9 次 / 开机 / 维护 / fast_full=false
+    D->>P: 标准 OTP 全刷 3852 ms
+    P-->>D: 实测 3976 ms (复用上电)
+  end
+  D->>D: committed() · 恢复后台刷新
+  Note over D,P: 保持上电后 idle_off_ms (默认 3000 ms) 无新标题则强制断电 (实测 3002–3004 ms)

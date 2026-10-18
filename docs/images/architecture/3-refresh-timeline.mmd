@@ -1,0 +1,19 @@
+gantt
+  title 导航标题局刷时间 (ms) · 实测 = 设备分段计时, 推算 = 由总时长扣除
+  dateFormat x
+  axisFormat %L ms
+  section 0.7.4 基线 (实测总计 483)
+  SPI+LUT+差异 ≈5 (推算)        :a1, 0, 5ms
+  0x04 上电 130 (0.7.6 实测)    :crit, a2, after a1, 130ms
+  0x12 nav500 波形 305 (0.7.6 实测) :active, a3, after a2, 305ms
+  固定 2 ms 延时/轮询 ≈3 (推算)  :a4, after a3, 3ms
+  0x02 断电 41 (0.7.6 实测)     :crit, a5, after a4, 40ms
+  section 0.7.8 第一次标题 (实测 440)
+  SPI 3.6 (实测)                :b1, 0, 4ms
+  0x04 上电 130 (实测)          :crit, b2, after b1, 130ms
+  0x12 波形 305 (实测)          :active, b3, after b2, 305ms
+  section 0.7.8 连续标题 hold_power (实测 309)
+  SPI 3.6 (实测)                :c1, 0, 4ms
+  0x12 波形 305 (实测)          :active, c2, after c1, 305ms
+  section 正文 OTP 局刷 (实测 1034)
+  OTP 局刷 1034 (实测总计)       :done, d1, 0, 1034ms
